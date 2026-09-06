@@ -1,0 +1,160 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String       @id @default(cuid())
+  userId       String?      @unique
+  name         String
+  email        String       @unique
+  password     String       @default("password123")
+  role         String       @default("EMPLOYEE") // "ADMIN" | "EMPLOYEE"
+  designation  String?      @default("Team Member")
+  avatar       String?
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  assignedTasks Task[]       @relation("AssignedTasks")
+  createdTasks  Task[]       @relation("CreatedTasks")
+  timeLogs      TimeLog[]
+  attendances   Attendance[]
+  dailyReports  DailyReport[]
+  leaveRequests  LeaveRequest[] @relation("UserLeaves")
+  reviewedLeaves LeaveRequest[] @relation("ReviewedLeaves")
+}
+
+model Task {
+  id                   String     @id @default(cuid())
+  title                String
+  description          String?
+  recurrence           String     @default("ONE_TIME") // ONE_TIME | DAILY | WEEKLY | MONTHLY | QUARTERLY | HALF_YEARLY | YEARLY
+  monthlyDay           Int?       // 1 - 31 (day of month for monthly & quarterly tasks)
+  weeklyDay            String?    // Monday, Tuesday, Wednesday, etc. for weekly tasks
+  startDate            DateTime?
+  dueDate              DateTime?
+  priority             String     @default("MEDIUM") // LOW | MEDIUM | HIGH | URGENT
+  
+  // Two-Tier Status Architecture
+  employeeStatus       String     @default("TODO") // TODO | IN_PROGRESS | ON_HOLD | COMPLETED
+  adminStatus          String     @default("NOT_SUBMITTED") // NOT_SUBMITTED | PENDING_REVIEW | FINAL_COMPLETED | REVISION_REQUESTED
+  
+  // Timer & Duration Tracking
+  totalDurationSeconds Int        @default(0)
+  isTimerRunning       Boolean    @default(false)
+  currentTimerStartedAt DateTime?
+
+  // Recurring Template metadata
+  isRecurringTemplate  Boolean    @default(false)
+  parentRecurringId    String?
+  lastGeneratedDate    DateTime?
+
+  assignedToId         String?
+  assignedTo           User?      @relation("AssignedTasks", fields: [assignedToId], references: [id], onDelete: SetNull)
+  
+  clientId             String?
+  client               Client?    @relation(fields: [clientId], references: [id], onDelete: SetNull)
+
+  createdById          String
+  createdBy            User       @relation("CreatedTasks", fields: [createdById], references: [id], onDelete: Cascade)
+
+  timeLogs             TimeLog[]
+  createdAt            DateTime   @default(now())
+  updatedAt            DateTime   @updatedAt
+}
+
+model Client {
+  id        String   @id @default(cuid())
+  name      String
+  company   String?
+  email     String?
+  phone     String?
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tasks     Task[]
+}
+
+model TimeLog {
+  id              String    @id @default(cuid())
+  taskId          String
+  task            Task      @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  userId          String
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  startTime       DateTime  @default(now())
+  endTime         DateTime?
+  durationSeconds Int       @default(0)
+  isRunning       Boolean   @default(false)
+  note            String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
+model Attendance {
+  id                  String    @id @default(cuid())
+  userId              String
+  user                User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  date                String    // YYYY-MM-DD
+  checkInTime         DateTime?
+  checkOutTime        DateTime?
+  workDurationSeconds Int       @default(0)
+  status              String    @default("PRESENT") // PRESENT | CHECKED_OUT | ABSENT_LEAVE
+  notes               String?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  @@unique([userId, date])
+}
+
+model DailyReport {
+  id                    String    @id @default(cuid())
+  userId                String
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  date                  String    // YYYY-MM-DD
+  totalTasksWorked      Int       @default(0)
+  completedTasks        Int       @default(0)
+  pendingTasks          Int       @default(0)
+  totalTimeSpentSeconds Int       @default(0)
+  attendanceStatus      String    @default("PRESENT")
+  checkInTime           DateTime?
+  checkOutTime          DateTime?
+  reportSummaryHtml     String
+  sentToAdminEmail      String?
+  emailSentAt           DateTime?
+  emailStatus           String    @default("PENDING") // PENDING | SENT | FAILED | PREVIEW_ONLY
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@unique([userId, date])
+}
+
+model SystemSetting {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     String
+  updatedAt DateTime @updatedAt
+}
+
+model LeaveRequest {
+  id           String    @id @default(cuid())
+  userId       String
+  user         User      @relation("UserLeaves", fields: [userId], references: [id], onDelete: Cascade)
+  leaveType    String    // CASUAL | SICK | EARNED | UNPAID | HALF_DAY
+  startDate    String    // YYYY-MM-DD
+  endDate      String    // YYYY-MM-DD
+  daysCount    Int       @default(1)
+  reason       String
+  status       String    @default("PENDING") // PENDING | APPROVED | REJECTED
+  reviewedById String?
+  reviewedBy   User?     @relation("ReviewedLeaves", fields: [reviewedById], references: [id], onDelete: SetNull)
+  reviewNotes  String?
+  reviewedAt   DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+}
+

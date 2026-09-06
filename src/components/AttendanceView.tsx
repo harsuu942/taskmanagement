@@ -1,0 +1,540 @@
+"use client";
+
+import React, { useState, useEffect } from "react";
+import { AttendanceRosterItem, User } from "@/types";
+import {
+  Clock,
+  LogIn,
+  LogOut,
+  Calendar,
+  CheckCircle2,
+  AlertCircle,
+  Users,
+  ShieldCheck,
+  UserX,
+  RefreshCw,
+} from "lucide-react";
+import { formatDuration } from "@/lib/formatters";
+
+interface AttendanceViewProps {
+  currentUser: User | null;
+  onRefresh: () => void;
+}
+
+export default function AttendanceView({ currentUser, onRefresh }: AttendanceViewProps) {
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const [datePreset, setDatePreset] = useState<string>("today");
+  const [startDate, setStartDate] = useState(todayStr);
+  const [endDate, setEndDate] = useState(todayStr);
+  const [employeeFilter, setEmployeeFilter] = useState("ALL");
+  const [employeesList, setEmployeesList] = useState<any[]>([]);
+
+  const [roster, setRoster] = useState<any[]>([]);
+  const [summary, setSummary] = useState({
+    totalRecords: 0,
+    totalEmployees: 0,
+    present: 0,
+    checkedOut: 0,
+    absentOrLeave: 0,
+    totalWorkDurationSeconds: 0,
+  });
+  const [loading, setLoading] = useState(true);
+  const [checkInNotes, setCheckInNotes] = useState("");
+  const [actionLoading, setActionLoading] = useState(false);
+  const [currentUserRecord, setCurrentUserRecord] = useState<any | null>(null);
+
+  const applyPreset = (preset: string) => {
+    setDatePreset(preset);
+    const now = new Date();
+    const today = now.toISOString().slice(0, 10);
+
+    if (preset === "today") {
+      setStartDate(today);
+      setEndDate(today);
+    } else if (preset === "yesterday") {
+      const y = new Date(now);
+      y.setDate(y.getDate() - 1);
+      const yStr = y.toISOString().slice(0, 10);
+      setStartDate(yStr);
+      setEndDate(yStr);
+    } else if (preset === "last7") {
+      const d7 = new Date(now);
+      d7.setDate(d7.getDate() - 6);
+      setStartDate(d7.toISOString().slice(0, 10));
+      setEndDate(today);
+    } else if (preset === "thisMonth") {
+      const firstDay = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10);
+      setStartDate(firstDay);
+      setEndDate(today);
+    }
+  };
+
+  const isAdmin = currentUser?.role === "ADMIN";
+
+  const fetchAttendance = async () => {
+    setLoading(true);
+    try {
+      const targetEmployeeId = isAdmin ? employeeFilter : (currentUser?.id || "");
+      const params = new URLSearchParams({
+        startDate,
+        endDate,
+        employeeId: targetEmployeeId,
+        userId: currentUser?.id || "",
+      });
+      const res = await fetch(`/api/attendance?${params.toString()}`);
+      const data = await res.json();
+      if (res.ok) {
+        setRoster(data.roster || []);
+        if (data.allEmployees) {
+          setEmployeesList(data.allEmployees);
+        }
+        if (data.currentUserAttendance) {
+          setCurrentUserRecord(data.currentUserAttendance);
+        }
+        setSummary(data.summary || {
+          totalRecords: 0,
+          totalEmployees: 0,
+          present: 0,
+          checkedOut: 0,
+          absentOrLeave: 0,
+          totalWorkDurationSeconds: 0,
+        });
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchAttendance();
+  }, [startDate, endDate, employeeFilter, currentUser]);
+
+
+  const handleAction = async (action: "check-in" | "check-out") => {
+    if (!currentUser) return;
+    setActionLoading(true);
+    try {
+      const res = await fetch("/api/attendance", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: currentUser.id,
+          action,
+          notes: checkInNotes,
+        }),
+      });
+      if (res.ok) {
+        setCheckInNotes("");
+        fetchAttendance();
+        onRefresh();
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const myRecord = roster.find((r) => r.employee?.id === currentUser?.id) || currentUserRecord;
+  const isCheckedIn = myRecord?.status === "PRESENT";
+  const isCheckedOut = myRecord?.status === "CHECKED_OUT";
+
+  return (
+    <div className="space-y-6">
+      {/* KPI Cards */}
+      {isAdmin ? (
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs flex items-center space-x-3">
+            <div className="p-3 bg-blue-50 text-blue-600 rounded-lg">
+              <Users className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="text-xs text-slate-500 font-medium">Total Staff</div>
+              <div className="text-xl font-bold text-slate-900">{summary.totalEmployees}</div>
+            </div>
+          </div>
+
+          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs flex items-center space-x-3">
+            <div className="p-3 bg-emerald-50 text-emerald-600 rounded-lg">
+              <LogIn className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="text-xs text-slate-500 font-medium">Checked In (Active)</div>
+              <div className="text-xl font-bold text-emerald-600">{summary.present}</div>
+            </div>
+          </div>
+
+          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs flex items-center space-x-3">
+            <div className="p-3 bg-indigo-50 text-indigo-600 rounded-lg">
+              <CheckCircle2 className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="text-xs text-slate-500 font-medium">Checked Out (Done)</div>
+              <div className="text-xl font-bold text-indigo-600">{summary.checkedOut}</div>
+            </div>
+          </div>
+
+          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs flex items-center space-x-3">
+            <div className="p-3 bg-rose-50 text-rose-600 rounded-lg">
+              <UserX className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="text-xs text-slate-500 font-medium">On Leave / Absent</div>
+              <div className="text-xl font-bold text-rose-600">{summary.absentOrLeave}</div>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs flex items-center space-x-3">
+            <div className="p-3 bg-blue-50 text-blue-600 rounded-lg">
+              <Calendar className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="text-xs text-slate-500 font-medium">Shifts Recorded</div>
+              <div className="text-xl font-bold text-slate-900">{roster.length}</div>
+            </div>
+          </div>
+
+          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs flex items-center space-x-3">
+            <div className="p-3 bg-emerald-50 text-emerald-600 rounded-lg">
+              <LogIn className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="text-xs text-slate-500 font-medium">Today's Status</div>
+              <div className="text-sm font-bold text-emerald-600">
+                {isCheckedIn ? "Active (Checked In)" : isCheckedOut ? "Shift Done" : "Not Checked In"}
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs flex items-center space-x-3">
+            <div className="p-3 bg-indigo-50 text-indigo-600 rounded-lg">
+              <CheckCircle2 className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="text-xs text-slate-500 font-medium">Completed Shifts</div>
+              <div className="text-xl font-bold text-indigo-600">
+                {roster.filter((r) => r.status === "CHECKED_OUT").length}
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs flex items-center space-x-3">
+            <div className="p-3 bg-teal-50 text-teal-600 rounded-lg">
+              <Clock className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="text-xs text-slate-500 font-medium">Total Work Time</div>
+              <div className="text-base font-bold text-teal-700 font-mono">
+                {formatDuration(summary.totalWorkDurationSeconds)}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+
+      {/* Interactive Personal Check-In / Check-Out Panel */}
+      <div className="bg-gradient-to-r from-slate-900 to-indigo-950 rounded-2xl p-6 text-white shadow-xl flex flex-col md:flex-row items-center justify-between gap-6">
+        <div>
+          <div className="flex items-center space-x-2">
+            <Clock className="w-5 h-5 text-blue-400" />
+            <h3 className="text-sm font-bold uppercase tracking-wider text-slate-300">
+              Personal Attendance Punch Card
+            </h3>
+          </div>
+          <div className="text-xl font-bold text-white mt-1 flex items-center space-x-2">
+            <span>{currentUser?.name}</span>
+            <span className="text-xs text-slate-400 font-normal">({currentUser?.email})</span>
+          </div>
+
+          <div className="mt-3 flex items-center space-x-4 text-xs text-slate-300">
+            <div>
+              Status:{" "}
+              {isCheckedIn ? (
+                <span className="text-emerald-400 font-bold bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-500/40">
+                  ● Checked In (Working)
+                </span>
+              ) : isCheckedOut ? (
+                <span className="text-blue-400 font-bold bg-blue-950/60 px-2 py-0.5 rounded border border-blue-500/40">
+                  ✓ Checked Out
+                </span>
+              ) : (
+                <span className="text-rose-400 font-bold bg-rose-950/60 px-2 py-0.5 rounded border border-rose-500/40">
+                  ● On Leave / Not Checked In
+                </span>
+              )}
+            </div>
+            {myRecord?.checkInTime && (
+              <div>
+                Check-In:{" "}
+                <strong className="text-white">
+                  {new Date(myRecord.checkInTime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                </strong>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Action Buttons */}
+        <div className="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto">
+          {!isCheckedIn ? (
+            <button
+              disabled={actionLoading || isCheckedOut}
+              onClick={() => handleAction("check-in")}
+              className="w-full sm:w-auto bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 text-white font-bold px-6 py-3 rounded-xl text-sm transition shadow-lg shadow-emerald-500/20 flex items-center justify-center space-x-2"
+            >
+              <LogIn className="w-4 h-4" />
+              <span>{isCheckedOut ? "Shift Finished" : "Submit Check-In"}</span>
+            </button>
+          ) : (
+            <button
+              disabled={actionLoading}
+              onClick={() => handleAction("check-out")}
+              className="w-full sm:w-auto bg-rose-500 hover:bg-rose-600 disabled:opacity-50 text-white font-bold px-6 py-3 rounded-xl text-sm transition shadow-lg shadow-rose-500/20 flex items-center justify-center space-x-2"
+            >
+              <LogOut className="w-4 h-4" />
+              <span>Submit Check-Out</span>
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Attendance Roster Table & Filter Toolbar */}
+      <div className="bg-white rounded-xl shadow-xs border border-slate-200 overflow-hidden">
+        {/* Filter Controls Header */}
+        <div className="p-4 border-b border-slate-200 bg-slate-50 space-y-3">
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <div className="flex items-center space-x-2">
+              <Calendar className="w-4 h-4 text-blue-600" />
+              <h4 className="text-sm font-bold text-slate-800">
+                {isAdmin ? "Staff Attendance Roster" : "My Attendance History"}
+              </h4>
+              <span className="text-xs bg-blue-100 text-blue-800 font-bold px-2 py-0.5 rounded-full">
+                {roster.length} {roster.length === 1 ? (isAdmin ? "record" : "shift") : (isAdmin ? "records" : "shifts")}
+              </span>
+            </div>
+
+            <div className="flex items-center space-x-2">
+              <button
+                onClick={fetchAttendance}
+                className="p-1.5 text-slate-500 hover:text-slate-800 hover:bg-slate-200 rounded-lg transition"
+                title="Refresh Roster"
+              >
+                <RefreshCw className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+
+          {/* Filter Toolbar: Presets, Date Range & Employee Select (Admin Only) */}
+          <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-3 pt-2 border-t border-slate-200">
+            {/* Quick Presets */}
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mr-1">
+                Period:
+              </span>
+              {[
+                { id: "today", label: "Today" },
+                { id: "yesterday", label: "Yesterday" },
+                { id: "last7", label: "Last 7 Days" },
+                { id: "thisMonth", label: "This Month" },
+                { id: "custom", label: "Custom Range" },
+              ].map((p) => (
+                <button
+                  key={p.id}
+                  onClick={() => applyPreset(p.id)}
+                  className={`px-2.5 py-1 text-xs font-bold rounded-lg transition ${
+                    datePreset === p.id
+                      ? "bg-blue-600 text-white shadow-xs"
+                      : "bg-white text-slate-600 hover:bg-slate-200 border border-slate-300"
+                  }`}
+                >
+                  {p.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Date Pickers & Optional Employee Dropdown (Admin only) */}
+            <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap w-full lg:w-auto">
+              <div className="flex items-center space-x-1.5 bg-white border border-slate-300 rounded-lg px-2.5 py-1 text-xs">
+                <span className="text-[10px] uppercase font-bold text-slate-400">From</span>
+                <input
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => {
+                    setDatePreset("custom");
+                    setStartDate(e.target.value);
+                  }}
+                  className="bg-transparent text-slate-700 outline-none font-medium text-xs"
+                />
+                <span className="text-[10px] uppercase font-bold text-slate-400">To</span>
+                <input
+                  type="date"
+                  value={endDate}
+                  onChange={(e) => {
+                    setDatePreset("custom");
+                    setEndDate(e.target.value);
+                  }}
+                  className="bg-transparent text-slate-700 outline-none font-medium text-xs"
+                />
+              </div>
+
+              {/* Employee Filter - ONLY visible to Admin */}
+              {isAdmin && (
+                <div className="flex items-center space-x-1.5">
+                  <select
+                    value={employeeFilter}
+                    onChange={(e) => setEmployeeFilter(e.target.value)}
+                    className="px-3 py-1.5 text-xs bg-white border border-slate-300 rounded-lg text-slate-700 outline-none focus:ring-2 focus:ring-blue-500 font-medium"
+                  >
+                    <option value="ALL">All Staff ({employeesList.length || summary.totalEmployees})</option>
+                    {employeesList.map((emp) => (
+                      <option key={emp.id} value={emp.id}>
+                        {emp.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {/* Clear Filter Button */}
+              {(datePreset !== "today" || (isAdmin && employeeFilter !== "ALL")) && (
+                <button
+                  onClick={() => {
+                    applyPreset("today");
+                    setEmployeeFilter("ALL");
+                  }}
+                  className="text-xs font-semibold text-rose-600 hover:text-rose-700 hover:underline px-1.5 py-1 whitespace-nowrap"
+                >
+                  Reset
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Roster Table */}
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs">
+            <thead>
+              <tr className="bg-slate-100 text-slate-600 font-bold border-b border-slate-200 uppercase tracking-wider text-[11px]">
+                <th className="py-3 px-4">Date</th>
+                {isAdmin && (
+                  <>
+                    <th className="py-3 px-4">Employee</th>
+                    <th className="py-3 px-4">Login User ID / Gmail</th>
+                  </>
+                )}
+                <th className="py-3 px-4">Check-In Time</th>
+                <th className="py-3 px-4">Check-Out Time</th>
+                <th className="py-3 px-4">Workday Duration</th>
+                <th className="py-3 px-4 text-right">Attendance Status</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-200">
+              {roster.length === 0 ? (
+                <tr>
+                  <td colSpan={isAdmin ? 7 : 5} className="py-12 text-center text-slate-400">
+                    {isAdmin
+                      ? "No attendance records found matching the selected filter criteria."
+                      : "No personal attendance records found for the selected period."}
+                  </td>
+                </tr>
+              ) : (
+                roster.map((item, idx) => (
+                  <tr key={`${item.employee?.id || currentUser?.id}-${item.date || idx}`} className="hover:bg-slate-50">
+                    <td className="py-3 px-4 font-mono font-medium text-slate-700 whitespace-nowrap">
+                      {item.date || startDate}
+                    </td>
+
+                    {isAdmin && (
+                      <>
+                        <td className="py-3 px-4 font-semibold text-slate-800">
+                          <div className="flex items-center space-x-2">
+                            {item.employee?.avatar ? (
+                              <img
+                                src={item.employee.avatar}
+                                alt={item.employee.name}
+                                className="w-6 h-6 rounded-full border border-slate-200"
+                              />
+                            ) : (
+                              <div className="w-6 h-6 rounded-full bg-slate-200 text-slate-700 font-bold text-[10px] flex items-center justify-center">
+                                {item.employee?.name?.slice(0, 1) || "E"}
+                              </div>
+                            )}
+                            <div>
+                              <div>{item.employee?.name}</div>
+                              <div className="text-[10px] text-slate-400 font-normal">
+                                {item.employee?.designation || "Team Member"}
+                              </div>
+                            </div>
+                          </div>
+                        </td>
+
+                        <td className="py-3 px-4 text-slate-600 font-mono text-[11px]">
+                          <div>
+                            {item.employee?.userId && (
+                              <span className="bg-blue-50 text-blue-700 font-bold px-1.5 py-0.5 rounded text-[10px] border border-blue-200 mr-1.5">
+                                {item.employee.userId}
+                              </span>
+                            )}
+                            <span>{item.employee?.email}</span>
+                          </div>
+                        </td>
+                      </>
+                    )}
+
+                    <td className="py-3 px-4 text-slate-700 font-medium">
+                      {item.checkInTime ? (
+                        new Date(item.checkInTime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+                      ) : (
+                        <span className="text-slate-400 italic">-</span>
+                      )}
+                    </td>
+
+                    <td className="py-3 px-4 text-slate-700 font-medium">
+                      {item.checkOutTime ? (
+                        new Date(item.checkOutTime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+                      ) : item.status === "PRESENT" ? (
+                        <span className="text-emerald-600 font-bold">Active Now</span>
+                      ) : (
+                        <span className="text-slate-400 italic">-</span>
+                      )}
+                    </td>
+
+                    <td className="py-3 px-4 font-mono font-bold text-slate-800">
+                      {formatDuration(item.workDurationSeconds)}
+                    </td>
+
+                    <td className="py-3 px-4 text-right whitespace-nowrap">
+                      {item.status === "PRESENT" ? (
+                        <span className="bg-emerald-100 text-emerald-800 font-bold px-2.5 py-1 rounded-full text-[10px] border border-emerald-200">
+                          ● Present (Checked In)
+                        </span>
+                      ) : item.status === "CHECKED_OUT" ? (
+                        <span className="bg-blue-100 text-blue-800 font-bold px-2.5 py-1 rounded-full text-[10px] border border-blue-200">
+                          ✓ Checked Out
+                        </span>
+                      ) : item.status === "ON_LEAVE" ? (
+                        <span className="bg-purple-100 text-purple-800 font-bold px-2.5 py-1 rounded-full text-[10px] border border-purple-200">
+                          🌴 Approved Leave
+                        </span>
+                      ) : (
+                        <span className="bg-rose-100 text-rose-800 font-bold px-2.5 py-1 rounded-full text-[10px] border border-rose-200">
+                          ● Absent
+                        </span>
+                      )}
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
