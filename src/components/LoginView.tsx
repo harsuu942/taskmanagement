@@ -10,8 +10,6 @@ import {
   Eye,
   EyeOff,
   AlertCircle,
-  Shield,
-  KeyRound,
 } from "lucide-react";
 
 interface LoginViewProps {
@@ -107,7 +105,7 @@ export default function LoginView({ onLogin }: LoginViewProps) {
                   type="text"
                   required
                   autoFocus
-                  placeholder="admin or gaurav141@gmail.com or employee User ID"
+                  placeholder="Enter your User ID or Email"
                   value={identifier}
                   onChange={(e) => setIdentifier(e.target.value)}
                   className="w-full pl-10 pr-3 py-2.5 text-xs bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium"
@@ -152,36 +150,11 @@ export default function LoginView({ onLogin }: LoginViewProps) {
               <ArrowRight className="w-4 h-4 ml-1" />
             </button>
           </form>
-
-          {/* Admin Credentials Guide */}
-          <div className="mt-6 pt-5 border-t border-slate-100 bg-slate-50/70 p-3.5 rounded-2xl border border-slate-200/70 text-[11px] text-slate-600 space-y-2">
-            <div className="font-bold text-slate-800 flex items-center gap-1.5 text-xs">
-              <KeyRound className="w-3.5 h-3.5 text-blue-600" />
-              <span>Admin Access Credentials:</span>
-            </div>
-            <div className="p-2.5 bg-white rounded-xl border border-slate-200 space-y-1.5 font-mono text-[10px]">
-              <div className="flex items-center justify-between">
-                <span className="font-bold text-purple-700">User ID / Email:</span>
-                <span className="text-slate-800 font-bold">admin <span className="font-normal text-slate-500 font-sans">(or gaurav141@gmail.com)</span></span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="font-bold text-purple-700">Default Password:</span>
-                <span className="text-slate-800 font-bold bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">admin123</span>
-              </div>
-              <div className="flex items-center justify-between text-[9px] text-slate-500 pt-1 border-t border-slate-100 font-sans">
-                <span>Admin Gmail Account:</span>
-                <span className="font-mono text-slate-700 font-medium">gaurav141@gmail.com</span>
-              </div>
-            </div>
-            <p className="text-[10px] text-slate-500 italic">
-              * Admin can change password anytime in Account Settings. Team members log in with credentials created by Admin.
-            </p>
-          </div>
         </div>
 
         {/* Footer */}
         <div className="px-6 py-3.5 bg-slate-50 border-t border-slate-100 text-center text-[11px] text-slate-500">
-          Navkar Accounting &amp; Consultancy Services &bull; Secure Authentication
+          Task Management Portal &bull; Secure Authentication
         </div>
       </div>
     </div>
