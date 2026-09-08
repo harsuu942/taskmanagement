@@ -109,9 +109,11 @@ model Attendance {
   checkOutTime          DateTime?
   workDurationSeconds   Int       @default(0)
   breakDurationSeconds  Int       @default(0)
-  isOnBreak             Boolean   @default(false)
-  currentBreakStartedAt DateTime?
-  status                String    @default("PRESENT") // PRESENT | ON_BREAK | CHECKED_OUT | ABSENT_LEAVE
+  isOnBreak                   Boolean   @default(false)
+  currentBreakStartedAt       DateTime?
+  lastCheckInTime             DateTime?
+  sessionBreakDurationSeconds Int       @default(0)
+  status                      String    @default("PRESENT") // PRESENT | ON_BREAK | CHECKED_OUT | ABSENT_LEAVE
   notes                 String?
   createdAt             DateTime  @default(now())
   updatedAt             DateTime  @updatedAt

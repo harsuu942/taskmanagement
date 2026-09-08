@@ -322,7 +322,7 @@ export default function TaskListView({
               className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-3.5 py-2 rounded-lg text-xs transition shadow-sm flex items-center gap-1.5 whitespace-nowrap cursor-pointer"
             >
               <Plus className="w-3.5 h-3.5" />
-              <span>+ Add Task</span>
+              <span>Add Task</span>
             </button>
           )}
         </div>

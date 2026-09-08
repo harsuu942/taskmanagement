@@ -114,11 +114,14 @@ export interface AttendanceRecord {
   breakDurationSeconds?: number;
   isOnBreak?: boolean;
   currentBreakStartedAt?: string | null;
+  lastCheckInTime?: string | null;
+  sessionBreakDurationSeconds?: number;
   status: AttendanceStatusType;
   notes?: string | null;
 }
 
 export interface AttendanceRosterItem {
+  date?: string;
   employee: User;
   record: AttendanceRecord | null;
   status: AttendanceStatusType;
@@ -128,6 +131,8 @@ export interface AttendanceRosterItem {
   breakDurationSeconds?: number;
   isOnBreak?: boolean;
   currentBreakStartedAt?: string | null;
+  lastCheckInTime?: string | null;
+  sessionBreakDurationSeconds?: number;
 }
 
 export interface TaskReportItem {

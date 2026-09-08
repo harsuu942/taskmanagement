@@ -147,7 +147,7 @@ export default function RecurringTasksView({
             className="bg-white hover:bg-slate-100 text-slate-900 font-extrabold px-4 py-2.5 rounded-xl text-xs transition shadow-md flex items-center space-x-1.5 cursor-pointer"
           >
             <Plus className="w-4 h-4 text-blue-600" />
-            <span>+ Add Task</span>
+            <span>Add Task</span>
           </button>
         </div>
       </div>

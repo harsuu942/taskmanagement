@@ -90,8 +90,16 @@ export default function Navbar({
       return;
     }
 
-    const checkInDate = new Date(userAttendance.checkInTime).getTime();
-    const totalPriorBreaks = userAttendance.breakDurationSeconds || 0;
+    const sessionStart = userAttendance.lastCheckInTime
+      ? new Date(userAttendance.lastCheckInTime).getTime()
+      : new Date(userAttendance.checkInTime).getTime();
+
+    // If re-checked in after an earlier session, base is prior completed work duration
+    const isResumedSession = !!userAttendance.lastCheckInTime && userAttendance.lastCheckInTime !== userAttendance.checkInTime;
+    const basePriorWork = isResumedSession ? (userAttendance.workDurationSeconds || 0) : 0;
+    const sessionBreaks = isResumedSession
+      ? (userAttendance.sessionBreakDurationSeconds || 0)
+      : (userAttendance.breakDurationSeconds || 0);
 
     const interval = setInterval(() => {
       if (isOnBreak && userAttendance.currentBreakStartedAt) {
@@ -99,8 +107,9 @@ export default function Navbar({
         return;
       }
       const now = Date.now();
-      const gross = Math.max(0, Math.floor((now - checkInDate) / 1000));
-      setElapsedWorkSeconds(Math.max(0, gross - totalPriorBreaks));
+      const currentGross = Math.max(0, Math.floor((now - sessionStart) / 1000));
+      const currentNet = Math.max(0, currentGross - sessionBreaks);
+      setElapsedWorkSeconds(basePriorWork + currentNet);
     }, 1000);
 
     return () => clearInterval(interval);

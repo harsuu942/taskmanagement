@@ -316,7 +316,7 @@ export default function ClientsView({
                             className="inline-flex items-center space-x-1 px-2.5 py-1.5 text-xs font-bold text-cyan-700 bg-cyan-50 hover:bg-cyan-100 rounded-lg border border-cyan-200 transition"
                           >
                             <Plus className="w-3.5 h-3.5 text-cyan-600" />
-                            <span>+ Add Task</span>
+                            <span>Add Task</span>
                           </button>
                         )}
                       </div>
