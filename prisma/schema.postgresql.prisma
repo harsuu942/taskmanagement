@@ -26,6 +26,7 @@ model User {
   dailyReports  DailyReport[]
   leaveRequests  LeaveRequest[] @relation("UserLeaves")
   reviewedLeaves LeaveRequest[] @relation("ReviewedLeaves")
+  taskAssignments TaskAssignee[]
 }
 
 model Task {
@@ -47,6 +48,7 @@ model Task {
   totalDurationSeconds Int        @default(0)
   isTimerRunning       Boolean    @default(false)
   currentTimerStartedAt DateTime?
+  billableHours        Float?     @default(0)
 
   // Recurring Template metadata
   isRecurringTemplate  Boolean    @default(false)
@@ -54,10 +56,12 @@ model Task {
   lastGeneratedDate    DateTime?
 
   assignedToId         String?
-  assignedTo           User?      @relation("AssignedTasks", fields: [assignedToId], references: [id], onDelete: SetNull)
+  assignedTo           User?          @relation("AssignedTasks", fields: [assignedToId], references: [id], onDelete: SetNull)
+  assignees            TaskAssignee[]
   
   clientId             String?
-  client               Client?    @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  client               Client?        @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  taskClients          TaskClient[]
 
   createdById          String
   createdBy            User       @relation("CreatedTasks", fields: [createdById], references: [id], onDelete: Cascade)
@@ -77,7 +81,8 @@ model Client {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  tasks     Task[]
+  tasks       Task[]
+  taskClients TaskClient[]
 }
 
 model TimeLog {
@@ -96,17 +101,20 @@ model TimeLog {
 }
 
 model Attendance {
-  id                  String    @id @default(cuid())
-  userId              String
-  user                User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  date                String    // YYYY-MM-DD
-  checkInTime         DateTime?
-  checkOutTime        DateTime?
-  workDurationSeconds Int       @default(0)
-  status              String    @default("PRESENT") // PRESENT | CHECKED_OUT | ABSENT_LEAVE
-  notes               String?
-  createdAt           DateTime  @default(now())
-  updatedAt           DateTime  @updatedAt
+  id                    String    @id @default(cuid())
+  userId                String
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  date                  String    // YYYY-MM-DD
+  checkInTime           DateTime?
+  checkOutTime          DateTime?
+  workDurationSeconds   Int       @default(0)
+  breakDurationSeconds  Int       @default(0)
+  isOnBreak             Boolean   @default(false)
+  currentBreakStartedAt DateTime?
+  status                String    @default("PRESENT") // PRESENT | ON_BREAK | CHECKED_OUT | ABSENT_LEAVE
+  notes                 String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
 
   @@unique([userId, date])
 }
@@ -157,4 +165,25 @@ model LeaveRequest {
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 }
+
+model TaskAssignee {
+  id     String @id @default(cuid())
+  taskId String
+  task   Task   @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([taskId, userId])
+}
+
+model TaskClient {
+  id       String @id @default(cuid())
+  taskId   String
+  task     Task   @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  clientId String
+  client   Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@unique([taskId, clientId])
+}
+
 

@@ -27,26 +27,51 @@ export async function GET(request: Request) {
         },
       });
 
+      // Accurate shift duration
+      let shiftDurationSeconds = 0;
+      if (attendance?.checkInTime) {
+        const inDate = new Date(attendance.checkInTime);
+        const outDate = attendance.checkOutTime
+          ? new Date(attendance.checkOutTime)
+          : (date === new Date().toISOString().slice(0, 10) ? new Date() : inDate);
+        const totalShiftSpan = Math.max(0, Math.floor((outDate.getTime() - inDate.getTime()) / 1000));
+        const breaks = attendance.breakDurationSeconds || 0;
+        shiftDurationSeconds = Math.max(0, totalShiftSpan - breaks);
+        if (attendance.workDurationSeconds && attendance.workDurationSeconds > 0) {
+          shiftDurationSeconds = attendance.workDurationSeconds;
+        }
+      }
+
+      // Date boundaries for task time logs
+      const startOfDay = new Date(`${date}T00:00:00.000Z`);
+      const endOfDay = new Date(`${date}T23:59:59.999Z`);
+
       // 2. Fetch tasks worked on or assigned
       const tasks = await prisma.task.findMany({
         where: {
-          assignedToId: emp.id,
           isRecurringTemplate: false,
+          OR: [
+            { assignedToId: emp.id },
+            { assignees: { some: { userId: emp.id } } },
+            { timeLogs: { some: { userId: emp.id, startTime: { gte: startOfDay, lte: endOfDay } } } },
+          ],
         },
         include: {
           timeLogs: {
             where: {
               userId: emp.id,
+              startTime: {
+                gte: startOfDay,
+                lte: endOfDay,
+              },
             },
           },
         },
       });
 
-      // Calculate task durations
+      // Calculate task durations strictly logged today
       const taskReportItems = tasks.map((t) => {
-        // Duration from today's logs, or fallback to total task duration
         const todayLogSum = t.timeLogs.reduce((acc, log) => acc + log.durationSeconds, 0);
-        const durationSeconds = todayLogSum > 0 ? todayLogSum : t.totalDurationSeconds;
 
         return {
           id: t.id,
@@ -55,7 +80,8 @@ export async function GET(request: Request) {
           priority: t.priority,
           employeeStatus: t.employeeStatus,
           adminStatus: t.adminStatus,
-          durationSeconds,
+          durationSeconds: todayLogSum,
+          billableHours: t.billableHours || 0,
         };
       });
 
@@ -75,9 +101,12 @@ export async function GET(request: Request) {
           status: attendance ? attendance.status : "ABSENT_LEAVE",
           checkInTime: attendance?.checkInTime?.toISOString() || null,
           checkOutTime: attendance?.checkOutTime?.toISOString() || null,
-          workDurationSeconds: attendance?.workDurationSeconds || 0,
+          workDurationSeconds: shiftDurationSeconds,
+          breakDurationSeconds: attendance?.breakDurationSeconds || 0,
+          isOnBreak: attendance?.isOnBreak || false,
         },
         tasks: taskReportItems,
+        shiftDurationSeconds,
         totalActiveSeconds,
         totalTasksCompleted,
         totalTasksPending,
@@ -136,14 +165,43 @@ export async function POST(request: Request) {
         },
       });
 
+      // Accurate shift duration
+      let shiftDurationSeconds = 0;
+      if (attendance?.checkInTime) {
+        const inDate = new Date(attendance.checkInTime);
+        const outDate = attendance.checkOutTime
+          ? new Date(attendance.checkOutTime)
+          : (date === new Date().toISOString().slice(0, 10) ? new Date() : inDate);
+        const totalShiftSpan = Math.max(0, Math.floor((outDate.getTime() - inDate.getTime()) / 1000));
+        const breaks = attendance.breakDurationSeconds || 0;
+        shiftDurationSeconds = Math.max(0, totalShiftSpan - breaks);
+        if (attendance.workDurationSeconds && attendance.workDurationSeconds > 0) {
+          shiftDurationSeconds = attendance.workDurationSeconds;
+        }
+      }
+
+      // Date boundaries for task time logs
+      const startOfDay = new Date(`${date}T00:00:00.000Z`);
+      const endOfDay = new Date(`${date}T23:59:59.999Z`);
+
       const tasks = await prisma.task.findMany({
         where: {
-          assignedToId: emp.id,
           isRecurringTemplate: false,
+          OR: [
+            { assignedToId: emp.id },
+            { assignees: { some: { userId: emp.id } } },
+            { timeLogs: { some: { userId: emp.id, startTime: { gte: startOfDay, lte: endOfDay } } } },
+          ],
         },
         include: {
           timeLogs: {
-            where: { userId: emp.id },
+            where: {
+              userId: emp.id,
+              startTime: {
+                gte: startOfDay,
+                lte: endOfDay,
+              },
+            },
           },
         },
       });
@@ -157,7 +215,8 @@ export async function POST(request: Request) {
           priority: t.priority,
           employeeStatus: t.employeeStatus,
           adminStatus: t.adminStatus,
-          durationSeconds: todayLogSum > 0 ? todayLogSum : t.totalDurationSeconds,
+          durationSeconds: todayLogSum,
+          billableHours: t.billableHours || 0,
         };
       });
 
@@ -177,16 +236,19 @@ export async function POST(request: Request) {
           status: attendance ? attendance.status : "ABSENT_LEAVE",
           checkInTime: attendance?.checkInTime?.toISOString() || null,
           checkOutTime: attendance?.checkOutTime?.toISOString() || null,
-          workDurationSeconds: attendance?.workDurationSeconds || 0,
+          workDurationSeconds: shiftDurationSeconds,
+          breakDurationSeconds: attendance?.breakDurationSeconds || 0,
+          isOnBreak: attendance?.isOnBreak || false,
         },
         tasks: taskReportItems,
+        shiftDurationSeconds,
         totalActiveSeconds,
         totalTasksCompleted,
         totalTasksPending,
       };
 
       const htmlContent = generateReportHtml(reportData);
-      const subject = `[nacsconsulting EOD Report] ${emp.name} - ${date} (${totalTasksCompleted} Completed, ${formatDurationSecs(totalActiveSeconds)} Active)`;
+      const subject = `[Daily Work Report] ${emp.name} - ${date} (${totalTasksCompleted} Completed, Shift: ${formatDurationSecs(shiftDurationSeconds)})`;
 
       // Dispatch Email via Gmail
       const emailRes = await sendEmailReport(targetAdminEmail, subject, htmlContent);

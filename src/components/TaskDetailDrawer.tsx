@@ -23,6 +23,8 @@ import {
   Lock,
   Save,
   Maximize2,
+  Plus,
+  Users,
 } from "lucide-react";
 import { formatDuration } from "@/lib/formatters";
 
@@ -57,6 +59,14 @@ export default function TaskDetailDrawer({
   const [isEditing, setIsEditing] = useState(false);
   const [saveLoading, setSaveLoading] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
+
+  // Manual time log form state
+  const [showManualLog, setShowManualLog] = useState(false);
+  const [manualDurationMinutes, setManualDurationMinutes] = useState("");
+  const [manualLogNote, setManualLogNote] = useState("");
+  const [manualLogDate, setManualLogDate] = useState(new Date().toISOString().slice(0, 10));
+  const [manualLogLoading, setManualLogLoading] = useState(false);
+  const [manualLogError, setManualLogError] = useState<string | null>(null);
 
   // Edit form fields
   const [editTitle, setEditTitle] = useState("");
@@ -203,6 +213,40 @@ export default function TaskDetailDrawer({
       setEditError(err.message);
     } finally {
       setSaveLoading(false);
+    }
+  };
+
+  const handleManualLogTime = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const mins = parseFloat(manualDurationMinutes);
+    if (!mins || mins <= 0) {
+      setManualLogError("Please enter a valid positive duration in minutes");
+      return;
+    }
+    setManualLogLoading(true);
+    setManualLogError(null);
+    try {
+      const res = await fetch(`/api/tasks/${task.id}/timer`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "manual_log",
+          durationMinutes: mins,
+          note: manualLogNote.trim() || "Manual time entry",
+          logDate: manualLogDate,
+          userId: currentUser?.id,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to log time");
+      setManualDurationMinutes("");
+      setManualLogNote("");
+      setShowManualLog(false);
+      onTaskUpdated();
+    } catch (err: any) {
+      setManualLogError(err.message);
+    } finally {
+      setManualLogLoading(false);
     }
   };
 
@@ -540,8 +584,20 @@ export default function TaskDetailDrawer({
                 </h2>
               </div>
 
-              {/* Client Info Pill */}
-              {task.client ? (
+              {/* Client Info Pill (Supports Multiple Clients) */}
+              {task.taskClients && task.taskClients.length > 0 ? (
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {task.taskClients.map((tc) => (
+                    <div
+                      key={tc.id}
+                      className="inline-flex items-center space-x-1.5 bg-cyan-50 border border-cyan-200 px-2.5 py-1 rounded-lg text-xs text-cyan-950 font-semibold shadow-2xs"
+                    >
+                      <Building2 className="w-3.5 h-3.5 text-cyan-700 flex-shrink-0" />
+                      <span>{tc.client?.company ? `${tc.client.company} (${tc.client?.name || ""})` : tc.client?.name || "Client"}</span>
+                    </div>
+                  ))}
+                </div>
+              ) : task.client ? (
                 <div className="mt-2 inline-flex items-center space-x-2 bg-cyan-50 border border-cyan-200 px-3 py-1.5 rounded-xl text-xs text-cyan-900 font-semibold shadow-2xs">
                   <Building2 className="w-4 h-4 text-cyan-700 flex-shrink-0" />
                   <div>
@@ -743,10 +799,168 @@ export default function TaskDetailDrawer({
                 )}
               </div>
             </div>
+
+            {/* Quick Toggle: Log Time Manually */}
+            <div className="mt-4 pt-3 border-t border-slate-800 flex items-center justify-between">
+              <span className="text-xs text-slate-400">Prefer entering hours manually?</span>
+              <button
+                type="button"
+                onClick={() => setShowManualLog(!showManualLog)}
+                className="text-xs text-blue-400 hover:text-blue-300 font-bold hover:underline flex items-center gap-1 cursor-pointer"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>{showManualLog ? "Hide Manual Entry" : "Log Time Manually"}</span>
+              </button>
+            </div>
+
+            {/* Manual Time Entry Form */}
+            {showManualLog && (
+              <form
+                onSubmit={handleManualLogTime}
+                className="mt-3 p-3.5 bg-slate-800/90 rounded-xl border border-slate-700 space-y-3"
+              >
+                <div className="text-xs font-bold text-white flex items-center gap-1.5">
+                  <Clock className="w-3.5 h-3.5 text-blue-400" />
+                  <span>Manual Time Entry</span>
+                </div>
+
+                {manualLogError && (
+                  <div className="text-xs text-rose-400 bg-rose-950/40 p-2 rounded border border-rose-800">
+                    {manualLogError}
+                  </div>
+                )}
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  <div>
+                    <label className="block text-[10px] uppercase font-bold text-slate-400 mb-1">
+                      Duration (Minutes) *
+                    </label>
+                    <input
+                      type="number"
+                      step="1"
+                      min="1"
+                      placeholder="e.g. 60"
+                      value={manualDurationMinutes}
+                      onChange={(e) => setManualDurationMinutes(e.target.value)}
+                      className="w-full px-2.5 py-1.5 text-xs bg-slate-900 border border-slate-700 rounded-lg text-white outline-none font-medium"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] uppercase font-bold text-slate-400 mb-1">
+                      Work Date
+                    </label>
+                    <input
+                      type="date"
+                      value={manualLogDate}
+                      onChange={(e) => setManualLogDate(e.target.value)}
+                      className="w-full px-2.5 py-1.5 text-xs bg-slate-900 border border-slate-700 rounded-lg text-white outline-none font-medium"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] uppercase font-bold text-slate-400 mb-1">
+                      Note / Description
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Work notes..."
+                      value={manualLogNote}
+                      onChange={(e) => setManualLogNote(e.target.value)}
+                      className="w-full px-2.5 py-1.5 text-xs bg-slate-900 border border-slate-700 rounded-lg text-white outline-none font-medium"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex justify-end gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => setShowManualLog(false)}
+                    className="px-3 py-1 text-xs text-slate-400 hover:text-white"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={manualLogLoading}
+                    className="px-4 py-1.5 text-xs font-bold bg-blue-600 hover:bg-blue-500 text-white rounded-lg transition shadow-xs cursor-pointer disabled:opacity-50"
+                  >
+                    {manualLogLoading ? "Logging..." : "Log Minutes"}
+                  </button>
+                </div>
+              </form>
+            )}
           </div>
 
+          {/* BILLABLE VS ACTUAL HOURS COMPARISON */}
+          {task.billableHours !== undefined && task.billableHours !== null && task.billableHours > 0 && (() => {
+            const actualHours = (task.totalDurationSeconds || 0) / 3600;
+            const pct = Math.min(100, Math.round((actualHours / task.billableHours) * 100));
+            const diff = actualHours - task.billableHours;
+            const isOver = diff > 0.05;
+
+            return (
+              <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-2xs space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <Clock className="w-4 h-4 text-indigo-600" />
+                    <span className="text-xs font-bold uppercase tracking-wider text-slate-800">
+                      Billable vs. Actual Hours
+                    </span>
+                  </div>
+                  <span
+                    className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                      isOver
+                        ? "bg-rose-100 text-rose-800 border-rose-300"
+                        : pct >= 90
+                        ? "bg-amber-100 text-amber-800 border-amber-300"
+                        : "bg-emerald-100 text-emerald-800 border-emerald-300"
+                    }`}
+                  >
+                    {isOver ? `+${diff.toFixed(1)}h Over Budget` : `${(task.billableHours - actualHours).toFixed(1)}h Remaining`}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-3 gap-2 text-center pt-1">
+                  <div className="p-2 bg-slate-50 rounded-lg border border-slate-100">
+                    <div className="text-[10px] uppercase font-bold text-slate-400">Budgeted</div>
+                    <div className="text-sm font-bold text-slate-800 mt-0.5">{task.billableHours} hrs</div>
+                  </div>
+                  <div className="p-2 bg-slate-50 rounded-lg border border-slate-100">
+                    <div className="text-[10px] uppercase font-bold text-slate-400">Actual Taken</div>
+                    <div className="text-sm font-bold text-blue-700 font-mono mt-0.5">{actualHours.toFixed(2)} hrs</div>
+                  </div>
+                  <div className="p-2 bg-slate-50 rounded-lg border border-slate-100">
+                    <div className="text-[10px] uppercase font-bold text-slate-400">Variance</div>
+                    <div className={`text-sm font-bold font-mono mt-0.5 ${isOver ? "text-rose-600" : "text-emerald-600"}`}>
+                      {diff > 0 ? `+${diff.toFixed(2)}h` : `${diff.toFixed(2)}h`}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Progress Bar */}
+                <div className="pt-1">
+                  <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
+                    <div
+                      className={`h-full transition-all duration-500 ${
+                        isOver ? "bg-rose-500" : pct >= 80 ? "bg-amber-500" : "bg-emerald-500"
+                      }`}
+                      style={{ width: `${pct}%` }}
+                    />
+                  </div>
+                  <div className="flex justify-between text-[10px] text-slate-400 mt-1 font-medium">
+                    <span>0h</span>
+                    <span>{pct}% of budget utilized</span>
+                    <span>{task.billableHours}h</span>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+
           {/* Properties Grid */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-slate-50 p-4 rounded-xl border border-slate-200 text-xs">
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 bg-slate-50 p-4 rounded-xl border border-slate-200 text-xs">
             <div>
               <span className="text-[10px] font-bold uppercase text-slate-400">Priority</span>
               <div className="mt-1 font-semibold text-slate-800 flex items-center gap-1">
@@ -761,9 +975,20 @@ export default function TaskDetailDrawer({
             </div>
 
             <div>
-              <span className="text-[10px] font-bold uppercase text-slate-400">Assignee</span>
-              <div className="mt-1 font-medium text-slate-800 truncate">
-                {task.assignedTo ? task.assignedTo.name : "Unassigned"}
+              <span className="text-[10px] font-bold uppercase text-slate-400">Assignees</span>
+              <div className="mt-1 font-medium text-slate-800 truncate" title={task.assignees && task.assignees.length > 0 ? task.assignees.map(a => a.user?.name || "").join(", ") : task.assignedTo?.name || "Unassigned"}>
+                {task.assignees && task.assignees.length > 0
+                  ? task.assignees.map((a) => a.user?.name || "").filter(Boolean).join(", ")
+                  : task.assignedTo
+                  ? task.assignedTo.name
+                  : "Unassigned"}
+              </div>
+            </div>
+
+            <div>
+              <span className="text-[10px] font-bold uppercase text-slate-400">Billable Est.</span>
+              <div className="mt-1 font-medium text-slate-800">
+                {task.billableHours ? `${task.billableHours} hrs` : "N/A"}
               </div>
             </div>
 

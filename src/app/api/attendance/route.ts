@@ -46,6 +46,9 @@ export async function GET(request: Request) {
             checkInTime: record.checkInTime,
             checkOutTime: record.checkOutTime,
             workDurationSeconds: record.workDurationSeconds,
+            breakDurationSeconds: record.breakDurationSeconds || 0,
+            isOnBreak: record.isOnBreak || false,
+            currentBreakStartedAt: record.currentBreakStartedAt,
           };
         } else {
           return {
@@ -56,6 +59,9 @@ export async function GET(request: Request) {
             checkInTime: null,
             checkOutTime: null,
             workDurationSeconds: 0,
+            breakDurationSeconds: 0,
+            isOnBreak: false,
+            currentBreakStartedAt: null,
           };
         }
       });
@@ -86,6 +92,9 @@ export async function GET(request: Request) {
         checkInTime: rec.checkInTime,
         checkOutTime: rec.checkOutTime,
         workDurationSeconds: rec.workDurationSeconds,
+        breakDurationSeconds: rec.breakDurationSeconds || 0,
+        isOnBreak: rec.isOnBreak || false,
+        currentBreakStartedAt: rec.currentBreakStartedAt,
       }));
     }
 
@@ -117,6 +126,9 @@ export async function GET(request: Request) {
             checkInTime: todayRecord.checkInTime,
             checkOutTime: todayRecord.checkOutTime,
             workDurationSeconds: todayRecord.workDurationSeconds,
+            breakDurationSeconds: todayRecord.breakDurationSeconds || 0,
+            isOnBreak: todayRecord.isOnBreak || false,
+            currentBreakStartedAt: todayRecord.currentBreakStartedAt,
           }
         : null,
       summary: {
@@ -215,6 +227,71 @@ export async function POST(request: Request) {
       });
     }
 
+    if (action === "break") {
+      if (!existing || existing.status === "CHECKED_OUT") {
+        return NextResponse.json(
+          { error: "Must be actively checked in to take a break." },
+          { status: 400 }
+        );
+      }
+
+      if (existing.isOnBreak) {
+        return NextResponse.json(
+          { message: "You are already on break.", record: existing },
+          { status: 200 }
+        );
+      }
+
+      const record = await prisma.attendance.update({
+        where: { id: existing.id },
+        data: {
+          status: "ON_BREAK",
+          isOnBreak: true,
+          currentBreakStartedAt: now,
+          notes: notes ? `${existing.notes || ''} | Break: ${notes}` : existing.notes,
+        },
+        include: { user: true },
+      });
+
+      return NextResponse.json({
+        success: true,
+        message: `Break started at ${now.toLocaleTimeString()}`,
+        record,
+      });
+    }
+
+    if (action === "resume-break") {
+      if (!existing || !existing.isOnBreak) {
+        return NextResponse.json(
+          { message: "You are not currently on break.", record: existing },
+          { status: 200 }
+        );
+      }
+
+      const breakSecs = existing.currentBreakStartedAt
+        ? Math.max(0, Math.floor((now.getTime() - new Date(existing.currentBreakStartedAt).getTime()) / 1000))
+        : 0;
+      const totalBreakSeconds = (existing.breakDurationSeconds || 0) + breakSecs;
+
+      const record = await prisma.attendance.update({
+        where: { id: existing.id },
+        data: {
+          status: "PRESENT",
+          isOnBreak: false,
+          currentBreakStartedAt: null,
+          breakDurationSeconds: totalBreakSeconds,
+          notes: notes ? `${existing.notes || ''} | Resumed work` : existing.notes,
+        },
+        include: { user: true },
+      });
+
+      return NextResponse.json({
+        success: true,
+        message: `Work resumed at ${now.toLocaleTimeString()} (Break: ${Math.floor(breakSecs / 60)}m)`,
+        record,
+      });
+    }
+
     if (action === "check-out") {
       if (!existing || !existing.checkInTime) {
         return NextResponse.json(
@@ -223,14 +300,25 @@ export async function POST(request: Request) {
         );
       }
 
+      // If checking out while on break, close the break session
+      let finalBreakSeconds = existing.breakDurationSeconds || 0;
+      if (existing.isOnBreak && existing.currentBreakStartedAt) {
+        const extraBreak = Math.max(0, Math.floor((now.getTime() - new Date(existing.currentBreakStartedAt).getTime()) / 1000));
+        finalBreakSeconds += extraBreak;
+      }
+
       const checkInDate = new Date(existing.checkInTime);
-      const totalSeconds = Math.max(0, Math.floor((now.getTime() - checkInDate.getTime()) / 1000));
+      const grossSeconds = Math.max(0, Math.floor((now.getTime() - checkInDate.getTime()) / 1000));
+      const netWorkSeconds = Math.max(0, grossSeconds - finalBreakSeconds);
 
       const record = await prisma.attendance.update({
         where: { id: existing.id },
         data: {
           checkOutTime: now,
-          workDurationSeconds: totalSeconds,
+          workDurationSeconds: netWorkSeconds,
+          breakDurationSeconds: finalBreakSeconds,
+          isOnBreak: false,
+          currentBreakStartedAt: null,
           status: "CHECKED_OUT",
           notes: notes ? `${existing.notes || ''} | ${notes}` : existing.notes,
         },
@@ -239,12 +327,12 @@ export async function POST(request: Request) {
 
       return NextResponse.json({
         success: true,
-        message: `Check-out recorded at ${now.toLocaleTimeString()}. Total shift duration: ${Math.floor(totalSeconds / 3600)}h ${Math.floor((totalSeconds % 3600) / 60)}m`,
+        message: `Check-out recorded at ${now.toLocaleTimeString()}. Net work duration: ${Math.floor(netWorkSeconds / 3600)}h ${Math.floor((netWorkSeconds % 3600) / 60)}m (Break: ${Math.floor(finalBreakSeconds / 60)}m)`,
         record,
       });
     }
 
-    return NextResponse.json({ error: "Invalid action. Use check-in or check-out." }, { status: 400 });
+    return NextResponse.json({ error: "Invalid action. Use check-in, check-out, break, or resume-break." }, { status: 400 });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }

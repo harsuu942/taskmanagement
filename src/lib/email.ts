@@ -5,7 +5,7 @@ export { formatDuration };
 export type { EmployeeDailyReportData, TaskReportItem };
 
 export function generateReportHtml(data: EmployeeDailyReportData): string {
-  const { employee, date, attendance, tasks, totalActiveSeconds, totalTasksCompleted, totalTasksPending } = data;
+  const { employee, date, attendance, tasks, totalActiveSeconds, totalTasksCompleted, totalTasksPending, shiftDurationSeconds } = data;
 
   const taskRows = tasks.length === 0
     ? `<tr><td colspan="5" style="padding: 16px; text-align: center; color: #6B778C;">No tasks worked on today.</td></tr>`
@@ -68,8 +68,8 @@ export function generateReportHtml(data: EmployeeDailyReportData): string {
         <table style="width: 100%;">
           <tr>
             <td>
-              <h1 style="margin: 0; font-size: 22px; font-weight: 700; letter-spacing: -0.5px;">nacsconsulting - Daily Employee Report</h1>
-              <p style="margin: 6px 0 0 0; opacity: 0.9; font-size: 13px;">Automated End of Day Task & Attendance Summary</p>
+              <h1 style="margin: 0; font-size: 22px; font-weight: 700; letter-spacing: -0.5px;">Daily Work & Task Report</h1>
+              <p style="margin: 6px 0 0 0; opacity: 0.9; font-size: 13px;">Automated End of Day Summary</p>
             </td>
             <td style="text-align: right;">
               <div style="background: rgba(255, 255, 255, 0.2); padding: 6px 14px; border-radius: 20px; display: inline-block; font-size: 12px; font-weight: 600;">
@@ -89,36 +89,38 @@ export function generateReportHtml(data: EmployeeDailyReportData): string {
               <div style="font-size: 13px; color: #6B778C; margin-top: 2px;">📧 ${employee.email} &bull; ${employee.designation || 'Team Member'}</div>
             </td>
             <td style="text-align: right;">
-              <span style="font-size: 12px; font-weight: 700; padding: 4px 12px; border-radius: 4px; ${attendance.status === 'PRESENT' || attendance.status === 'CHECKED_OUT' ? 'background: #E3FCEF; color: #006644;' : 'background: #FFEBE6; color: #BF2600;'}">
-                ● ${attendance.status === 'PRESENT' ? 'Checked In (Present)' : attendance.status === 'CHECKED_OUT' ? 'Checked Out' : 'On Leave / Absent'}
+              <span style="font-size: 12px; font-weight: 700; padding: 4px 12px; border-radius: 4px; ${attendance.status === 'PRESENT' || attendance.status === 'CHECKED_OUT' ? 'background: #E3FCEF; color: #006644;' : attendance.status === 'ON_BREAK' ? 'background: #FFF0B3; color: #172B4D;' : 'background: #FFEBE6; color: #BF2600;'}">
+                ● ${attendance.status === 'PRESENT' ? 'Checked In (Present)' : attendance.status === 'ON_BREAK' ? 'On Break' : attendance.status === 'CHECKED_OUT' ? 'Checked Out' : 'On Leave / Absent'}
               </span>
             </td>
           </tr>
         </table>
 
         <!-- Metrics Cards -->
-        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-top: 20px;">
-          <table style="width: 100%; border-collapse: separate; border-spacing: 8px 0; margin-top: 12px;">
-            <tr>
-              <td style="background: #FFFFFF; border: 1px solid #DFE1E6; border-radius: 6px; padding: 12px; text-align: center; width: 25%;">
-                <div style="font-size: 11px; color: #6B778C; text-transform: uppercase; font-weight: 600;">Check In</div>
-                <div style="font-size: 14px; font-weight: 700; color: #172B4D; margin-top: 4px;">${attendance.checkInTime ? new Date(attendance.checkInTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'N/A'}</div>
-              </td>
-              <td style="background: #FFFFFF; border: 1px solid #DFE1E6; border-radius: 6px; padding: 12px; text-align: center; width: 25%;">
-                <div style="font-size: 11px; color: #6B778C; text-transform: uppercase; font-weight: 600;">Check Out</div>
-                <div style="font-size: 14px; font-weight: 700; color: #172B4D; margin-top: 4px;">${attendance.checkOutTime ? new Date(attendance.checkOutTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Active'}</div>
-              </td>
-              <td style="background: #FFFFFF; border: 1px solid #DFE1E6; border-radius: 6px; padding: 12px; text-align: center; width: 25%;">
-                <div style="font-size: 11px; color: #6B778C; text-transform: uppercase; font-weight: 600;">Task Timer Total</div>
-                <div style="font-size: 14px; font-weight: 700; color: #0052CC; margin-top: 4px;">${formatDuration(totalActiveSeconds)}</div>
-              </td>
-              <td style="background: #FFFFFF; border: 1px solid #DFE1E6; border-radius: 6px; padding: 12px; text-align: center; width: 25%;">
-                <div style="font-size: 11px; color: #6B778C; text-transform: uppercase; font-weight: 600;">Tasks Done / Pending</div>
-                <div style="font-size: 14px; font-weight: 700; color: #36B37E; margin-top: 4px;">${totalTasksCompleted} / ${totalTasksPending}</div>
-              </td>
-            </tr>
-          </table>
-        </div>
+        <table style="width: 100%; border-collapse: separate; border-spacing: 6px 0; margin-top: 14px;">
+          <tr>
+            <td style="background: #FFFFFF; border: 1px solid #DFE1E6; border-radius: 6px; padding: 10px; text-align: center; width: 18%;">
+              <div style="font-size: 10px; color: #6B778C; text-transform: uppercase; font-weight: 600;">Check In</div>
+              <div style="font-size: 13px; font-weight: 700; color: #172B4D; margin-top: 4px;">${attendance.checkInTime ? new Date(attendance.checkInTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'N/A'}</div>
+            </td>
+            <td style="background: #FFFFFF; border: 1px solid #DFE1E6; border-radius: 6px; padding: 10px; text-align: center; width: 18%;">
+              <div style="font-size: 10px; color: #6B778C; text-transform: uppercase; font-weight: 600;">Check Out</div>
+              <div style="font-size: 13px; font-weight: 700; color: #172B4D; margin-top: 4px;">${attendance.checkOutTime ? new Date(attendance.checkOutTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : (attendance.status === 'PRESENT' ? 'Active' : 'N/A')}</div>
+            </td>
+            <td style="background: #FFFFFF; border: 1px solid #DFE1E6; border-radius: 6px; padding: 10px; text-align: center; width: 22%;">
+              <div style="font-size: 10px; color: #6B778C; text-transform: uppercase; font-weight: 600;">Shift Duration</div>
+              <div style="font-size: 13px; font-weight: 700; color: #0052CC; margin-top: 4px;">${formatDuration(shiftDurationSeconds || attendance.workDurationSeconds || 0)}</div>
+            </td>
+            <td style="background: #FFFFFF; border: 1px solid #DFE1E6; border-radius: 6px; padding: 10px; text-align: center; width: 18%;">
+              <div style="font-size: 10px; color: #6B778C; text-transform: uppercase; font-weight: 600;">Break Time</div>
+              <div style="font-size: 13px; font-weight: 700; color: #FFAB00; margin-top: 4px;">${attendance.breakDurationSeconds ? formatDuration(attendance.breakDurationSeconds) : '0m'}</div>
+            </td>
+            <td style="background: #FFFFFF; border: 1px solid #DFE1E6; border-radius: 6px; padding: 10px; text-align: center; width: 24%;">
+              <div style="font-size: 10px; color: #6B778C; text-transform: uppercase; font-weight: 600;">Tasks Completed</div>
+              <div style="font-size: 13px; font-weight: 700; color: #36B37E; margin-top: 4px;">${totalTasksCompleted} / ${tasks.length}</div>
+            </td>
+          </tr>
+        </table>
       </div>
 
       <!-- Tasks Section -->
@@ -145,7 +147,7 @@ export function generateReportHtml(data: EmployeeDailyReportData): string {
 
       <!-- Footer Note -->
       <div style="background: #F4F5F7; padding: 16px 32px; border-top: 1px solid #EBECF0; font-size: 12px; color: #6B778C; text-align: center;">
-        This report was automatically compiled by nacsconsulting Task Management System.<br>
+        This report was automatically compiled by Task Management Portal.<br>
         Admin review: Tasks marked as 'Pending Review' can be finalized in the Admin Dashboard.
       </div>
     </div>
@@ -207,7 +209,7 @@ export async function sendEmailReport(
       });
 
       const info = await transporter.sendMail({
-        from: `"nacsconsulting Manager" <${gmailUser}>`,
+        from: `"Task Management Portal" <${gmailUser}>`,
         to: toEmail,
         subject: subject,
         html: htmlContent,

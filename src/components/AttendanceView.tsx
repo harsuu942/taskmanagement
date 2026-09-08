@@ -13,8 +13,12 @@ import {
   ShieldCheck,
   UserX,
   RefreshCw,
+  Coffee,
+  Play,
+  FileSpreadsheet,
 } from "lucide-react";
 import { formatDuration } from "@/lib/formatters";
+import { exportToExcel } from "@/lib/excelExport";
 
 interface AttendanceViewProps {
   currentUser: User | null;
@@ -112,7 +116,7 @@ export default function AttendanceView({ currentUser, onRefresh }: AttendanceVie
   }, [startDate, endDate, employeeFilter, currentUser]);
 
 
-  const handleAction = async (action: "check-in" | "check-out") => {
+  const handleAction = async (action: "check-in" | "check-out" | "break" | "resume-break") => {
     if (!currentUser) return;
     setActionLoading(true);
     try {
@@ -138,8 +142,45 @@ export default function AttendanceView({ currentUser, onRefresh }: AttendanceVie
   };
 
   const myRecord = roster.find((r) => r.employee?.id === currentUser?.id) || currentUserRecord;
-  const isCheckedIn = myRecord?.status === "PRESENT";
+  const isOnBreak = myRecord?.status === "ON_BREAK" || !!myRecord?.isOnBreak;
+  const isCheckedIn = (myRecord?.status === "PRESENT" || (!myRecord?.checkOutTime && !!myRecord?.checkInTime && myRecord?.status !== "CHECKED_OUT")) && !isOnBreak;
   const isCheckedOut = myRecord?.status === "CHECKED_OUT";
+
+  const handleExportExcel = () => {
+    exportToExcel(
+      `Attendance_Report_${startDate}_to_${endDate}`,
+      [
+        { header: "Date", key: "date" },
+        { header: "Employee Name", formatter: (r: any) => r.employee?.name || "N/A" },
+        { header: "User ID", formatter: (r: any) => r.employee?.userId || r.employee?.email || "" },
+        { header: "Designation", formatter: (r: any) => r.employee?.designation || "" },
+        { header: "Status", key: "status" },
+        {
+          header: "Check In Time",
+          formatter: (r: any) =>
+            r.checkInTime ? new Date(r.checkInTime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "N/A",
+        },
+        {
+          header: "Check Out Time",
+          formatter: (r: any) =>
+            r.checkOutTime ? new Date(r.checkOutTime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : (r.status === "PRESENT" ? "Active" : "N/A"),
+        },
+        {
+          header: "Break Duration",
+          formatter: (r: any) => (r.breakDurationSeconds ? formatDuration(r.breakDurationSeconds) : "0m"),
+        },
+        {
+          header: "Net Work Duration",
+          formatter: (r: any) => formatDuration(r.workDurationSeconds || 0),
+        },
+        {
+          header: "Notes",
+          formatter: (r: any) => r.record?.notes || "",
+        },
+      ],
+      roster
+    );
+  };
 
   return (
     <div className="space-y-6">
@@ -254,7 +295,11 @@ export default function AttendanceView({ currentUser, onRefresh }: AttendanceVie
           <div className="mt-3 flex items-center space-x-4 text-xs text-slate-300">
             <div>
               Status:{" "}
-              {isCheckedIn ? (
+              {isOnBreak ? (
+                <span className="text-amber-400 font-bold bg-amber-950/60 px-2 py-0.5 rounded border border-amber-500/40">
+                  ☕ On Break
+                </span>
+              ) : isCheckedIn ? (
                 <span className="text-emerald-400 font-bold bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-500/40">
                   ● Checked In (Working)
                 </span>
@@ -276,12 +321,59 @@ export default function AttendanceView({ currentUser, onRefresh }: AttendanceVie
                 </strong>
               </div>
             )}
+            {myRecord?.breakDurationSeconds ? (
+              <div>
+                Total Break:{" "}
+                <strong className="text-amber-300">
+                  {formatDuration(myRecord.breakDurationSeconds)}
+                </strong>
+              </div>
+            ) : null}
           </div>
         </div>
 
         {/* Action Buttons */}
         <div className="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto">
-          {!isCheckedIn ? (
+          {isOnBreak ? (
+            <>
+              <button
+                disabled={actionLoading}
+                onClick={() => handleAction("resume-break")}
+                className="w-full sm:w-auto bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-white font-bold px-5 py-3 rounded-xl text-sm transition shadow-lg shadow-amber-500/20 flex items-center justify-center space-x-2"
+              >
+                <Play className="w-4 h-4 fill-current" />
+                <span>Resume Work</span>
+              </button>
+              <button
+                disabled={actionLoading}
+                onClick={() => handleAction("check-out")}
+                className="w-full sm:w-auto bg-rose-500 hover:bg-rose-600 disabled:opacity-50 text-white font-bold px-5 py-3 rounded-xl text-sm transition shadow-lg shadow-rose-500/20 flex items-center justify-center space-x-2"
+              >
+                <LogOut className="w-4 h-4" />
+                <span>Submit Check-Out</span>
+              </button>
+            </>
+          ) : isCheckedIn ? (
+            <>
+              <button
+                disabled={actionLoading}
+                onClick={() => handleAction("break")}
+                className="w-full sm:w-auto bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-white font-bold px-5 py-3 rounded-xl text-sm transition shadow-lg shadow-amber-500/20 flex items-center justify-center space-x-2"
+                title="Take a break (Pauses work shift)"
+              >
+                <Coffee className="w-4 h-4" />
+                <span>Take Break</span>
+              </button>
+              <button
+                disabled={actionLoading}
+                onClick={() => handleAction("check-out")}
+                className="w-full sm:w-auto bg-rose-500 hover:bg-rose-600 disabled:opacity-50 text-white font-bold px-5 py-3 rounded-xl text-sm transition shadow-lg shadow-rose-500/20 flex items-center justify-center space-x-2"
+              >
+                <LogOut className="w-4 h-4" />
+                <span>Submit Check-Out</span>
+              </button>
+            </>
+          ) : (
             <button
               disabled={actionLoading || isCheckedOut}
               onClick={() => handleAction("check-in")}
@@ -289,15 +381,6 @@ export default function AttendanceView({ currentUser, onRefresh }: AttendanceVie
             >
               <LogIn className="w-4 h-4" />
               <span>{isCheckedOut ? "Shift Finished" : "Submit Check-In"}</span>
-            </button>
-          ) : (
-            <button
-              disabled={actionLoading}
-              onClick={() => handleAction("check-out")}
-              className="w-full sm:w-auto bg-rose-500 hover:bg-rose-600 disabled:opacity-50 text-white font-bold px-6 py-3 rounded-xl text-sm transition shadow-lg shadow-rose-500/20 flex items-center justify-center space-x-2"
-            >
-              <LogOut className="w-4 h-4" />
-              <span>Submit Check-Out</span>
             </button>
           )}
         </div>
@@ -319,6 +402,14 @@ export default function AttendanceView({ currentUser, onRefresh }: AttendanceVie
             </div>
 
             <div className="flex items-center space-x-2">
+              <button
+                onClick={handleExportExcel}
+                className="flex items-center space-x-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition shadow-xs"
+                title="Export current attendance roster to Excel"
+              >
+                <FileSpreadsheet className="w-3.5 h-3.5" />
+                <span>Download Excel</span>
+              </button>
               <button
                 onClick={fetchAttendance}
                 className="p-1.5 text-slate-500 hover:text-slate-800 hover:bg-slate-200 rounded-lg transition"
@@ -430,14 +521,15 @@ export default function AttendanceView({ currentUser, onRefresh }: AttendanceVie
                 )}
                 <th className="py-3 px-4">Check-In Time</th>
                 <th className="py-3 px-4">Check-Out Time</th>
-                <th className="py-3 px-4">Workday Duration</th>
+                <th className="py-3 px-4">Break Time</th>
+                <th className="py-3 px-4">Net Work Time</th>
                 <th className="py-3 px-4 text-right">Attendance Status</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200">
               {roster.length === 0 ? (
                 <tr>
-                  <td colSpan={isAdmin ? 7 : 5} className="py-12 text-center text-slate-400">
+                  <td colSpan={isAdmin ? 8 : 6} className="py-12 text-center text-slate-400">
                     {isAdmin
                       ? "No attendance records found matching the selected filter criteria."
                       : "No personal attendance records found for the selected period."}
@@ -500,9 +592,15 @@ export default function AttendanceView({ currentUser, onRefresh }: AttendanceVie
                         new Date(item.checkOutTime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
                       ) : item.status === "PRESENT" ? (
                         <span className="text-emerald-600 font-bold">Active Now</span>
+                      ) : item.status === "ON_BREAK" ? (
+                        <span className="text-amber-600 font-bold">On Break</span>
                       ) : (
                         <span className="text-slate-400 italic">-</span>
                       )}
+                    </td>
+
+                    <td className="py-3 px-4 font-mono text-slate-600">
+                      {item.breakDurationSeconds ? formatDuration(item.breakDurationSeconds) : "-"}
                     </td>
 
                     <td className="py-3 px-4 font-mono font-bold text-slate-800">
@@ -510,7 +608,11 @@ export default function AttendanceView({ currentUser, onRefresh }: AttendanceVie
                     </td>
 
                     <td className="py-3 px-4 text-right whitespace-nowrap">
-                      {item.status === "PRESENT" ? (
+                      {item.status === "ON_BREAK" ? (
+                        <span className="bg-amber-100 text-amber-800 font-bold px-2.5 py-1 rounded-full text-[10px] border border-amber-300">
+                          ☕ On Break
+                        </span>
+                      ) : item.status === "PRESENT" ? (
                         <span className="bg-emerald-100 text-emerald-800 font-bold px-2.5 py-1 rounded-full text-[10px] border border-emerald-200">
                           ● Present (Checked In)
                         </span>

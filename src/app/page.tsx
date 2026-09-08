@@ -190,6 +190,40 @@ export default function Home() {
     }
   };
 
+  // Take Break handler
+  const handleTakeBreak = async () => {
+    if (!currentUser) return;
+    try {
+      const res = await fetch("/api/attendance", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: currentUser.id, action: "break" }),
+      });
+      if (res.ok) {
+        fetchAttendance();
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  // Resume Break handler
+  const handleResumeBreak = async () => {
+    if (!currentUser) return;
+    try {
+      const res = await fetch("/api/attendance", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: currentUser.id, action: "resume-break" }),
+      });
+      if (res.ok) {
+        fetchAttendance();
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
   // Timer Action handler (start, hold, resume, stop, complete)
   const handleTimerAction = async (
     taskId: string,
@@ -299,7 +333,7 @@ export default function Home() {
     return (
       <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center text-slate-500">
         <div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mb-3"></div>
-        <span className="font-semibold text-sm">Loading nacsconsulting portal...</span>
+        <span className="font-semibold text-sm">Loading Task Management portal...</span>
       </div>
     );
   }
@@ -316,7 +350,7 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col w-full">
-      {/* nacsconsulting Header Navigation with Logo & Completed Tasks tab */}
+      {/* Portal Header Navigation with Logo & Completed Tasks tab */}
       <Navbar
         currentUser={currentUser}
         allUsers={allUsers}
@@ -327,6 +361,8 @@ export default function Home() {
         userAttendance={userAttendance}
         onCheckIn={handleCheckIn}
         onCheckOut={handleCheckOut}
+        onTakeBreak={handleTakeBreak}
+        onResumeBreak={handleResumeBreak}
         activeRunningTask={activeRunningTask}
         onOpenTaskModal={() => {
           setTaskToEdit(null);
@@ -383,6 +419,11 @@ export default function Home() {
             allUsers={allUsers}
             clients={clients}
             onSelectTask={handleSelectTask}
+            onAddNewTask={() => {
+              setTaskToEdit(null);
+              setTaskModalInitialClientId("");
+              setIsTaskModalOpen(true);
+            }}
             onEditTask={(task) => {
               setTaskToEdit(task);
               setIsTaskModalOpen(true);

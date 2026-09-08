@@ -22,6 +22,8 @@ import {
   Edit3,
   Trash2,
   AlertTriangle,
+  Plus,
+  Users,
 } from "lucide-react";
 import { formatDuration } from "@/lib/formatters";
 
@@ -31,6 +33,7 @@ interface TaskListViewProps {
   allUsers: User[];
   clients?: Client[];
   onSelectTask: (task: Task) => void;
+  onAddNewTask?: () => void;
   onEditTask?: (task: Task) => void;
   onDeleteTask?: (taskId: string) => Promise<void>;
   onTimerAction: (taskId: string, action: "start" | "hold" | "resume" | "stop" | "complete") => Promise<void>;
@@ -44,6 +47,7 @@ export default function TaskListView({
   allUsers,
   clients = [],
   onSelectTask,
+  onAddNewTask,
   onEditTask,
   onDeleteTask,
   onTimerAction,
@@ -66,10 +70,18 @@ export default function TaskListView({
     return new Date(task.dueDate).getTime() < Date.now();
   };
 
+  const isTaskVisibleForUser = (t: Task) => {
+    if (isAdmin) return true;
+    if (t.assignedToId === currentUser?.id) return true;
+    if (t.assignees && t.assignees.some((a) => a.userId === currentUser?.id)) return true;
+    if (t.createdById === currentUser?.id) return true;
+    return false;
+  };
+
   // Base visible tasks for this user
   const visibleBaseTasks = tasks
     .filter((t) => t.adminStatus !== "FINAL_COMPLETED")
-    .filter((t) => isAdmin || t.assignedToId === currentUser?.id);
+    .filter(isTaskVisibleForUser);
 
   const overdueTasksCount = visibleBaseTasks.filter(isTaskOverdue).length;
 
@@ -96,21 +108,40 @@ export default function TaskListView({
   const filteredTasks = tasks
     .filter((t) => t.adminStatus !== "FINAL_COMPLETED")
     .filter((t) => {
-      // Strict Rule 1: Employees can see his/her tasks only
-      if (!isAdmin && t.assignedToId !== currentUser?.id) {
+      // Role-based visibility check
+      if (!isTaskVisibleForUser(t)) {
         return false;
       }
 
       if (searchTerm) {
-        const matchTitle = t.title.toLowerCase().includes(searchTerm.toLowerCase());
-        const matchDesc = t.description?.toLowerCase().includes(searchTerm.toLowerCase());
-        const matchClient = t.client?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          t.client?.company?.toLowerCase().includes(searchTerm.toLowerCase());
+        const q = searchTerm.toLowerCase();
+        const matchTitle = t.title.toLowerCase().includes(q);
+        const matchDesc = t.description?.toLowerCase().includes(q);
+        const matchClient =
+          t.client?.name?.toLowerCase().includes(q) ||
+          t.client?.company?.toLowerCase().includes(q) ||
+          t.taskClients?.some(
+            (tc) =>
+              tc.client?.name?.toLowerCase().includes(q) ||
+              (tc.client?.company && tc.client.company.toLowerCase().includes(q))
+          );
         if (!matchTitle && !matchDesc && !matchClient) return false;
       }
 
-      if (isAdmin && filterAssignee !== "ALL" && t.assignedToId !== filterAssignee) return false;
-      if (filterClient !== "ALL" && t.clientId !== filterClient) return false;
+      if (isAdmin && filterAssignee !== "ALL") {
+        const hasAssignee =
+          t.assignedToId === filterAssignee ||
+          (t.assignees && t.assignees.some((a) => a.userId === filterAssignee));
+        if (!hasAssignee) return false;
+      }
+
+      if (filterClient !== "ALL") {
+        const hasClient =
+          t.clientId === filterClient ||
+          (t.taskClients && t.taskClients.some((tc) => tc.clientId === filterClient));
+        if (!hasClient) return false;
+      }
+
       if (filterPriority !== "ALL" && t.priority !== filterPriority) return false;
       if (filterRecurrence !== "ALL" && t.recurrence !== filterRecurrence) return false;
       if (filterStatus !== "ALL") {
@@ -283,6 +314,17 @@ export default function TaskListView({
               <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping ml-1" />
             )}
           </button>
+
+          {/* Add Task Button */}
+          {onAddNewTask && (
+            <button
+              onClick={onAddNewTask}
+              className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-3.5 py-2 rounded-lg text-xs transition shadow-sm flex items-center gap-1.5 whitespace-nowrap cursor-pointer"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>+ Add Task</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -367,9 +409,22 @@ export default function TaskListView({
                     )}
                   </td>
 
-                  {/* Client Column */}
-                  <td className="py-3.5 px-3 whitespace-nowrap">
-                    {task.client ? (
+                  {/* Client Column (Supports Multiple Clients) */}
+                  <td className="py-3.5 px-3">
+                    {task.taskClients && task.taskClients.length > 0 ? (
+                      <div className="flex flex-wrap gap-1 max-w-[170px]">
+                        {task.taskClients.map((tc) => (
+                          <span
+                            key={tc.id}
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-cyan-50 text-cyan-900 border border-cyan-200 text-[10px] font-bold truncate max-w-[160px] shadow-2xs"
+                            title={tc.client?.company ? `${tc.client.company} (${tc.client?.name || ""})` : tc.client?.name || ""}
+                          >
+                            <Building2 className="w-2.5 h-2.5 text-cyan-700 flex-shrink-0" />
+                            <span className="truncate">{tc.client?.company || tc.client?.name || "Client"}</span>
+                          </span>
+                        ))}
+                      </div>
+                    ) : task.client ? (
                       <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-cyan-50 text-cyan-900 border border-cyan-200 text-[11px] font-bold truncate max-w-[150px] shadow-2xs">
                         <Building2 className="w-3 h-3 text-cyan-700 flex-shrink-0" />
                         <span className="truncate">{task.client.company || task.client.name}</span>
@@ -379,9 +434,39 @@ export default function TaskListView({
                     )}
                   </td>
 
-                  {/* Assignee */}
+                  {/* Assignee Column (Supports Multiple Assignees) */}
                   <td className="py-3.5 px-3 whitespace-nowrap">
-                    {task.assignedTo ? (
+                    {task.assignees && task.assignees.length > 0 ? (
+                      <div
+                        className="flex items-center space-x-1.5"
+                        title={task.assignees.map((a) => `${a.user?.name || ""} (${a.user?.email || ""})`).join(", ")}
+                      >
+                        <div className="flex -space-x-2 overflow-hidden py-0.5">
+                          {task.assignees.slice(0, 3).map((a) =>
+                            a.user?.avatar ? (
+                              <img
+                                key={a.id}
+                                src={a.user.avatar}
+                                alt={a.user?.name || ""}
+                                className="inline-block w-6 h-6 rounded-full ring-2 ring-white"
+                              />
+                            ) : (
+                              <div
+                                key={a.id}
+                                className="inline-block w-6 h-6 rounded-full bg-blue-100 text-blue-800 font-bold text-[10px] flex items-center justify-center ring-2 ring-white"
+                              >
+                                {a.user?.name ? a.user.name.slice(0, 1) : "?"}
+                              </div>
+                            )
+                          )}
+                        </div>
+                        <span className="font-semibold text-slate-800 text-xs">
+                          {task.assignees.length === 1
+                            ? (task.assignees[0].user?.name || "1 member")
+                            : `${task.assignees.length} members`}
+                        </span>
+                      </div>
+                    ) : task.assignedTo ? (
                       <div className="flex items-center space-x-2" title={`${task.assignedTo.name} (${task.assignedTo.email})`}>
                         {task.assignedTo.avatar ? (
                           <img
@@ -458,12 +543,33 @@ export default function TaskListView({
                     )}
                   </td>
 
-                  {/* Timer Logged */}
-                  <td className="py-3.5 px-3 whitespace-nowrap font-mono font-semibold">
-                    <div className="flex items-center space-x-1 text-slate-800">
+                  {/* Timer Logged & Billable Hours Comparison */}
+                  <td className="py-3.5 px-3 whitespace-nowrap font-mono">
+                    <div className="flex items-center space-x-1 text-slate-800 font-semibold">
                       <Clock className="w-3.5 h-3.5 text-slate-400" />
                       <span>{formatDuration(task.totalDurationSeconds)}</span>
                     </div>
+                    {task.billableHours !== undefined && task.billableHours !== null && task.billableHours > 0 && (() => {
+                      const actualHours = (task.totalDurationSeconds || 0) / 3600;
+                      const diff = actualHours - task.billableHours;
+                      const isOver = diff > 0.05;
+                      return (
+                        <div className="mt-1 flex items-center gap-1 font-sans">
+                          <span
+                            className={`text-[10px] font-bold px-1.5 py-0.2 rounded border ${
+                              isOver
+                                ? "bg-rose-50 text-rose-700 border-rose-200"
+                                : "bg-emerald-50 text-emerald-700 border-emerald-200"
+                            }`}
+                            title={`Billable: ${task.billableHours}h | Actual: ${actualHours.toFixed(2)}h (${
+                              isOver ? `+${diff.toFixed(1)}h over budget` : `${Math.abs(diff).toFixed(1)}h under budget`
+                            })`}
+                          >
+                            Est: {task.billableHours}h {isOver ? `(+${diff.toFixed(1)}h)` : "✓"}
+                          </span>
+                        </div>
+                      );
+                    })()}
                   </td>
 
                   {/* Employee Status */}

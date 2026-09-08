@@ -43,24 +43,45 @@ export default function CompletedTasksView({
 
   const isAdmin = currentUser?.role === "ADMIN";
 
-  // Only show tasks that are finalized by Admin
-  // AND for employees, strictly only their own completed tasks
-  const completedTasks = tasks.filter((t) => {
+  const isCompletedVisible = (t: Task) => {
     if (t.adminStatus !== "FINAL_COMPLETED") return false;
-    if (!isAdmin && t.assignedToId !== currentUser?.id) return false;
-    return true;
-  });
+    if (isAdmin) return true;
+    if (t.assignedToId === currentUser?.id) return true;
+    if (t.assignees && t.assignees.some((a) => a.userId === currentUser?.id)) return true;
+    if (t.createdById === currentUser?.id) return true;
+    return false;
+  };
+
+  // Only show tasks that are finalized by Admin
+  const completedTasks = tasks.filter(isCompletedVisible);
 
   const filteredTasks = completedTasks.filter((t) => {
     if (searchTerm) {
-      const matchTitle = t.title.toLowerCase().includes(searchTerm.toLowerCase());
-      const matchDesc = t.description?.toLowerCase().includes(searchTerm.toLowerCase());
-      const matchClient = t.client?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        t.client?.company?.toLowerCase().includes(searchTerm.toLowerCase());
+      const q = searchTerm.toLowerCase();
+      const matchTitle = t.title.toLowerCase().includes(q);
+      const matchDesc = t.description?.toLowerCase().includes(q);
+      const matchClient =
+        t.client?.name?.toLowerCase().includes(q) ||
+        t.client?.company?.toLowerCase().includes(q) ||
+        t.taskClients?.some(
+          (tc) =>
+            tc.client?.name?.toLowerCase().includes(q) ||
+            (tc.client?.company && tc.client.company.toLowerCase().includes(q))
+        );
       if (!matchTitle && !matchDesc && !matchClient) return false;
     }
-    if (isAdmin && filterAssignee !== "ALL" && t.assignedToId !== filterAssignee) return false;
-    if (filterClient !== "ALL" && t.clientId !== filterClient) return false;
+    if (isAdmin && filterAssignee !== "ALL") {
+      const hasAssignee =
+        t.assignedToId === filterAssignee ||
+        (t.assignees && t.assignees.some((a) => a.userId === filterAssignee));
+      if (!hasAssignee) return false;
+    }
+    if (filterClient !== "ALL") {
+      const hasClient =
+        t.clientId === filterClient ||
+        (t.taskClients && t.taskClients.some((tc) => tc.clientId === filterClient));
+      if (!hasClient) return false;
+    }
     if (filterPriority !== "ALL" && t.priority !== filterPriority) return false;
     if (filterRecurrence !== "ALL" && t.recurrence !== filterRecurrence) return false;
     return true;
@@ -261,9 +282,22 @@ export default function CompletedTasksView({
                       )}
                     </td>
 
-                    {/* Client */}
+                    {/* Client (Supports Multiple) */}
                     <td className="py-3.5 px-3 whitespace-nowrap">
-                      {task.client ? (
+                      {task.taskClients && task.taskClients.length > 0 ? (
+                        <div className="flex flex-wrap gap-1 max-w-[160px]">
+                          {task.taskClients.map((tc) => (
+                            <span
+                              key={tc.id}
+                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-cyan-50 text-cyan-900 border border-cyan-200 text-[10px] font-bold truncate max-w-[150px] shadow-2xs"
+                              title={tc.client?.company ? `${tc.client.company} (${tc.client?.name || ""})` : tc.client?.name || ""}
+                            >
+                              <Building2 className="w-2.5 h-2.5 text-cyan-700 flex-shrink-0" />
+                              <span className="truncate">{tc.client?.company || tc.client?.name || "Client"}</span>
+                            </span>
+                          ))}
+                        </div>
+                      ) : task.client ? (
                         <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-cyan-50 text-cyan-900 border border-cyan-200 text-[11px] font-bold truncate max-w-[150px] shadow-2xs">
                           <Building2 className="w-3 h-3 text-cyan-700 flex-shrink-0" />
                           <span className="truncate">{task.client.company || task.client.name}</span>
@@ -273,8 +307,39 @@ export default function CompletedTasksView({
                       )}
                     </td>
 
+                    {/* Completed By (Supports Multiple Assignees) */}
                     <td className="py-3.5 px-3 whitespace-nowrap">
-                      {task.assignedTo ? (
+                      {task.assignees && task.assignees.length > 0 ? (
+                        <div
+                          className="flex items-center space-x-1.5"
+                          title={task.assignees.map((a) => `${a.user?.name || ""} (${a.user?.email || ""})`).join(", ")}
+                        >
+                          <div className="flex -space-x-1.5 overflow-hidden">
+                            {task.assignees.slice(0, 3).map((a) =>
+                              a.user?.avatar ? (
+                                <img
+                                  key={a.id}
+                                  src={a.user.avatar}
+                                  alt={a.user?.name || ""}
+                                  className="inline-block w-6 h-6 rounded-full ring-2 ring-white"
+                                />
+                              ) : (
+                                <div
+                                  key={a.id}
+                                  className="inline-block w-6 h-6 rounded-full bg-emerald-100 text-emerald-800 font-bold text-[10px] flex items-center justify-center ring-2 ring-white"
+                                >
+                                  {a.user?.name ? a.user.name.slice(0, 1) : "?"}
+                                </div>
+                              )
+                            )}
+                          </div>
+                          <span className="font-semibold text-slate-800 text-xs">
+                            {task.assignees.length === 1
+                              ? (task.assignees[0].user?.name || "1 member")
+                              : `${task.assignees.length} members`}
+                          </span>
+                        </div>
+                      ) : task.assignedTo ? (
                         <div className="flex items-center space-x-2">
                           {task.assignedTo.avatar ? (
                             <img
@@ -309,11 +374,33 @@ export default function CompletedTasksView({
                       </span>
                     </td>
 
+                    {/* Total Time Spent & Billable Hours Comparison */}
                     <td className="py-3.5 px-3 whitespace-nowrap font-mono font-bold text-emerald-700">
                       <div className="flex items-center space-x-1">
                         <Clock className="w-3.5 h-3.5 text-emerald-600" />
                         <span>{formatDuration(task.totalDurationSeconds)}</span>
                       </div>
+                      {task.billableHours !== undefined && task.billableHours !== null && task.billableHours > 0 && (() => {
+                        const actualHours = (task.totalDurationSeconds || 0) / 3600;
+                        const diff = actualHours - task.billableHours;
+                        const isOver = diff > 0.05;
+                        return (
+                          <div className="mt-1 font-sans">
+                            <span
+                              className={`text-[10px] font-bold px-1.5 py-0.2 rounded border ${
+                                isOver
+                                  ? "bg-rose-50 text-rose-700 border-rose-200"
+                                  : "bg-emerald-50 text-emerald-800 border-emerald-200"
+                              }`}
+                              title={`Budgeted: ${task.billableHours}h | Actual: ${actualHours.toFixed(2)}h (${
+                                isOver ? `+${diff.toFixed(1)}h over budget` : `${Math.abs(diff).toFixed(1)}h under budget`
+                              })`}
+                            >
+                              Est: {task.billableHours}h {isOver ? `(+${diff.toFixed(1)}h)` : "✓ On Budget"}
+                            </span>
+                          </div>
+                        );
+                      })()}
                     </td>
 
                     <td className="py-3.5 px-3 whitespace-nowrap text-slate-600">

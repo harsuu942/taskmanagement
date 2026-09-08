@@ -147,7 +147,7 @@ export default function ClientsView({
             <div>
               <h2 className="text-xl font-extrabold tracking-tight">Client Directory &amp; Accounts</h2>
               <p className="text-xs text-cyan-100 mt-0.5">
-                Manage nacsconsulting enterprise clients, tax portfolios, and audit accounts
+                Manage enterprise clients, tax portfolios, and audit accounts
               </p>
             </div>
           </div>

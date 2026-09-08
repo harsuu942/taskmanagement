@@ -67,7 +67,7 @@ export default function LoginView({ onLogin }: LoginViewProps) {
             <div className="bg-white p-3 rounded-2xl shadow-lg">
               <img
                 src="/logo.png"
-                alt="nacsconsulting"
+                alt="Task Management Logo"
                 className="h-12 w-auto object-contain"
                 onError={(e) => {
                   (e.target as HTMLElement).style.display = "none";

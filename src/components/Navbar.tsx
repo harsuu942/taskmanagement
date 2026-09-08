@@ -19,6 +19,7 @@ import {
   CheckCheck,
   Building2,
   CalendarDays,
+  Coffee,
 } from "lucide-react";
 
 interface NavbarProps {
@@ -31,6 +32,8 @@ interface NavbarProps {
   userAttendance: AttendanceRosterItem | null;
   onCheckIn: () => Promise<void>;
   onCheckOut: () => Promise<void>;
+  onTakeBreak?: () => Promise<void>;
+  onResumeBreak?: () => Promise<void>;
   activeRunningTask?: Task | null;
   onOpenTaskModal: () => void;
   onOpenSettingsModal: () => void;
@@ -47,6 +50,8 @@ export default function Navbar({
   userAttendance,
   onCheckIn,
   onCheckOut,
+  onTakeBreak,
+  onResumeBreak,
   activeRunningTask,
   onOpenTaskModal,
   onOpenSettingsModal,
@@ -54,6 +59,29 @@ export default function Navbar({
 }: NavbarProps) {
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [elapsedWorkSeconds, setElapsedWorkSeconds] = useState(0);
+  const [elapsedBreakSeconds, setElapsedBreakSeconds] = useState(0);
+
+  const isOnBreak = userAttendance?.status === "ON_BREAK" || !!userAttendance?.isOnBreak;
+  const isCheckedIn = userAttendance?.status === "PRESENT" || (!userAttendance?.checkOutTime && !!userAttendance?.checkInTime && !isOnBreak && userAttendance?.status !== "CHECKED_OUT");
+  const isCheckedOut = userAttendance?.status === "CHECKED_OUT";
+  const isAdmin = currentUser?.role === "ADMIN";
+
+  // Live timer for break
+  useEffect(() => {
+    if (!isOnBreak || !userAttendance?.currentBreakStartedAt) {
+      setElapsedBreakSeconds(0);
+      return;
+    }
+
+    const breakStart = new Date(userAttendance.currentBreakStartedAt).getTime();
+    const interval = setInterval(() => {
+      const now = Date.now();
+      const diff = Math.max(0, Math.floor((now - breakStart) / 1000));
+      setElapsedBreakSeconds(diff);
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [isOnBreak, userAttendance]);
 
   // Live timer for checked-in workday
   useEffect(() => {
@@ -63,15 +91,20 @@ export default function Navbar({
     }
 
     const checkInDate = new Date(userAttendance.checkInTime).getTime();
+    const totalPriorBreaks = userAttendance.breakDurationSeconds || 0;
 
     const interval = setInterval(() => {
+      if (isOnBreak && userAttendance.currentBreakStartedAt) {
+        // Paused during break
+        return;
+      }
       const now = Date.now();
-      const diff = Math.max(0, Math.floor((now - checkInDate) / 1000));
-      setElapsedWorkSeconds(diff);
+      const gross = Math.max(0, Math.floor((now - checkInDate) / 1000));
+      setElapsedWorkSeconds(Math.max(0, gross - totalPriorBreaks));
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [userAttendance]);
+  }, [userAttendance, isOnBreak]);
 
   const formatHoursMins = (secs: number) => {
     const h = Math.floor(secs / 3600);
@@ -79,10 +112,6 @@ export default function Navbar({
     const s = secs % 60;
     return `${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
   };
-
-  const isCheckedIn = userAttendance?.status === "PRESENT";
-  const isCheckedOut = userAttendance?.status === "CHECKED_OUT";
-  const isAdmin = currentUser?.role === "ADMIN";
 
   // Distinct Color Coded Top Navigation Tabs with Role-Based Visibility
   const allNavItems = [
@@ -155,12 +184,12 @@ export default function Navbar({
       {/* Brand & Action Bar */}
       <div className="w-full px-4 sm:px-6 lg:px-8 border-b border-slate-100">
         <div className="flex items-center justify-between h-16 py-2 gap-3">
-          {/* Official Logo from nacsconsulting.com */}
+          {/* Official Logo */}
           <div className="flex items-center flex-shrink-0">
             <div className="p-1 rounded-xl bg-slate-50 border border-slate-200 shadow-2xs">
               <img
                 src="/logo.png"
-                alt="nacsconsulting"
+                alt="Task Management Logo"
                 className="h-10 w-auto max-w-[180px] sm:max-w-[220px] object-contain"
                 onError={(e) => {
                   (e.target as HTMLElement).style.display = "none";
@@ -185,10 +214,41 @@ export default function Navbar({
               </div>
             )}
 
-            {/* Attendance Punch In/Out Widget (Always accessible for accidental checkout recovery) */}
+            {/* Attendance Punch In/Out/Break Widget (Break Button on TOP) */}
             <div className="flex items-center bg-slate-100 rounded-lg p-1 border border-slate-200">
-              {isCheckedIn ? (
-                <div className="flex items-center space-x-2 px-2 py-0.5">
+              {isOnBreak ? (
+                <div className="flex items-center space-x-1.5 px-2 py-0.5">
+                  <span className="relative flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
+                  </span>
+                  <div className="flex flex-col text-left">
+                    <span className="text-[9px] uppercase font-bold text-amber-700 leading-tight">On Break</span>
+                    <span className="text-xs font-mono font-bold text-amber-900 leading-tight">
+                      {formatHoursMins(elapsedBreakSeconds)}
+                    </span>
+                  </div>
+                  {onResumeBreak && (
+                    <button
+                      onClick={onResumeBreak}
+                      className="ml-1 bg-amber-600 hover:bg-amber-700 text-white px-2.5 py-1 rounded text-xs font-bold transition shadow-xs flex items-center space-x-1"
+                      title="Resume work from break"
+                    >
+                      <Play className="w-3 h-3 fill-current" />
+                      <span>Resume Work</span>
+                    </button>
+                  )}
+                  <button
+                    onClick={onCheckOut}
+                    className="ml-0.5 bg-rose-600 hover:bg-rose-700 text-white px-2 py-1 rounded text-xs font-bold transition shadow-xs flex items-center space-x-1"
+                    title="Check out for the day"
+                  >
+                    <LogOut className="w-3 h-3" />
+                    <span className="hidden sm:inline">Check Out</span>
+                  </button>
+                </div>
+              ) : isCheckedIn ? (
+                <div className="flex items-center space-x-1.5 px-2 py-0.5">
                   <span className="relative flex h-2 w-2">
                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                     <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
@@ -199,9 +259,19 @@ export default function Navbar({
                       {formatHoursMins(elapsedWorkSeconds)}
                     </span>
                   </div>
+                  {onTakeBreak && (
+                    <button
+                      onClick={onTakeBreak}
+                      className="ml-1 bg-amber-500 hover:bg-amber-600 text-white px-2 py-1 rounded text-xs font-bold transition shadow-xs flex items-center space-x-1"
+                      title="Take a break (Pauses work shift)"
+                    >
+                      <Coffee className="w-3 h-3" />
+                      <span className="font-bold">Break</span>
+                    </button>
+                  )}
                   <button
                     onClick={onCheckOut}
-                    className="ml-1 bg-rose-600 hover:bg-rose-700 text-white px-2.5 py-1 rounded text-xs font-bold transition shadow-xs flex items-center space-x-1"
+                    className="ml-0.5 bg-rose-600 hover:bg-rose-700 text-white px-2 py-1 rounded text-xs font-bold transition shadow-xs flex items-center space-x-1"
                     title="Check out for the day"
                   >
                     <LogOut className="w-3 h-3" />

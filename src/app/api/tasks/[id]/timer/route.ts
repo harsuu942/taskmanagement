@@ -147,7 +147,62 @@ export async function POST(
       });
     }
 
-    return NextResponse.json({ error: "Invalid action. Use start, hold, resume, or complete." }, { status: 400 });
+    if (action === "manual_log") {
+      const { durationMinutes, durationSeconds, logDate, note } = body;
+      const secs = durationSeconds
+        ? parseInt(durationSeconds, 10)
+        : durationMinutes
+        ? Math.round(parseFloat(durationMinutes) * 60)
+        : 0;
+      if (secs <= 0) {
+        return NextResponse.json(
+          { error: "Please provide a valid positive duration." },
+          { status: 400 }
+        );
+      }
+
+      const logTimestamp = logDate ? new Date(logDate) : new Date();
+      const endTimestamp = new Date(logTimestamp.getTime() + secs * 1000);
+
+      await prisma.timeLog.create({
+        data: {
+          taskId: task.id,
+          userId: userId || task.assignedToId || task.createdById,
+          startTime: logTimestamp,
+          endTime: endTimestamp,
+          durationSeconds: secs,
+          isRunning: false,
+          note: note || "Manual time entry",
+          createdAt: logTimestamp,
+        },
+      });
+
+      const newTotal = (task.totalDurationSeconds || 0) + secs;
+
+      const updated = await prisma.task.update({
+        where: { id: task.id },
+        data: {
+          totalDurationSeconds: newTotal,
+        },
+        include: {
+          assignedTo: true,
+          taskClients: { include: { client: true } },
+          assignees: { include: { user: true } },
+          timeLogs: { orderBy: { createdAt: "desc" } },
+        },
+      });
+
+      return NextResponse.json({
+        success: true,
+        task: updated,
+        message: `Manually logged ${Math.round(secs / 60)} minutes to task.`,
+      });
+    }
+
+    return NextResponse.json(
+      { error: "Invalid action. Use start, hold, resume, complete, or manual_log." },
+      { status: 400 }
+    );
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }

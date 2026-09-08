@@ -17,6 +17,8 @@ export async function processRecurringTasks() {
     },
     include: {
       assignedTo: true,
+      taskClients: true,
+      assignees: true,
     },
   });
 
@@ -100,9 +102,21 @@ export async function processRecurringTasks() {
           employeeStatus: "TODO",
           adminStatus: "NOT_SUBMITTED",
           assignedToId: tpl.assignedToId,
+          clientId: tpl.clientId,
+          billableHours: tpl.billableHours,
           createdById: tpl.createdById,
           parentRecurringId: tpl.id,
           isRecurringTemplate: false,
+          taskClients: tpl.taskClients?.length
+            ? {
+                create: tpl.taskClients.map((tc: any) => ({ clientId: tc.clientId })),
+              }
+            : undefined,
+          assignees: tpl.assignees?.length
+            ? {
+                create: tpl.assignees.map((ta: any) => ({ userId: ta.userId })),
+              }
+            : undefined,
         },
       });
 

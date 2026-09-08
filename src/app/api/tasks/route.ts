@@ -1,8 +1,16 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { processRecurringTasks } from "@/lib/scheduler";
 
 export async function GET(request: Request) {
   try {
+    // Auto-process any pending recurring tasks for today
+    try {
+      await processRecurringTasks();
+    } catch (schedErr) {
+      console.error("[Tasks API] Scheduler auto-run warning:", schedErr);
+    }
+
     const { searchParams } = new URL(request.url);
     const assignedToId = searchParams.get("assignedToId");
     const clientId = searchParams.get("clientId");
@@ -16,20 +24,37 @@ export async function GET(request: Request) {
     const role = searchParams.get("role");
 
     const where: any = {};
+    const andConditions: any[] = [];
 
     if (!showTemplates) {
       where.isRecurringTemplate = false;
     }
 
-    // Role-based isolation: Employees only see their own tasks
+    // Role-based isolation: Employees see tasks assigned directly, multi-assigned, or created by them
     if (role === "EMPLOYEE" && userId) {
-      where.assignedToId = userId;
+      andConditions.push({
+        OR: [
+          { assignedToId: userId },
+          { assignees: { some: { userId: userId } } },
+          { createdById: userId },
+        ],
+      });
     } else if (assignedToId && assignedToId !== "ALL") {
-      where.assignedToId = assignedToId;
+      andConditions.push({
+        OR: [
+          { assignedToId: assignedToId },
+          { assignees: { some: { userId: assignedToId } } },
+        ],
+      });
     }
 
     if (clientId && clientId !== "ALL") {
-      where.clientId = clientId;
+      andConditions.push({
+        OR: [
+          { clientId: clientId },
+          { taskClients: { some: { clientId: clientId } } },
+        ],
+      });
     }
 
     if (recurrence && recurrence !== "ALL") {
@@ -49,10 +74,16 @@ export async function GET(request: Request) {
     }
 
     if (search) {
-      where.OR = [
-        { title: { contains: search } },
-        { description: { contains: search } },
-      ];
+      andConditions.push({
+        OR: [
+          { title: { contains: search } },
+          { description: { contains: search } },
+        ],
+      });
+    }
+
+    if (andConditions.length > 0) {
+      where.AND = andConditions;
     }
 
     const tasks = await prisma.task.findMany({
@@ -61,9 +92,19 @@ export async function GET(request: Request) {
         assignedTo: true,
         createdBy: true,
         client: true,
+        taskClients: {
+          include: {
+            client: true,
+          },
+        },
+        assignees: {
+          include: {
+            user: true,
+          },
+        },
         timeLogs: {
           orderBy: { createdAt: "desc" },
-          take: 5,
+          take: 10,
         },
       },
       orderBy: [
@@ -91,8 +132,11 @@ export async function POST(request: Request) {
       dueDate,
       priority = "MEDIUM",
       assignedToId,
+      assigneeIds,
       createdById,
       clientId,
+      clientIds,
+      billableHours = 0,
     } = body;
 
     if (!title || !createdById) {
@@ -108,13 +152,33 @@ export async function POST(request: Request) {
     });
 
     let effectiveAssignedToId = assignedToId || null;
+    let effectiveAssigneeIds: string[] = Array.isArray(assigneeIds) ? assigneeIds : [];
 
     // Strict Rule: Employees can only create tasks for themselves and cannot assign to any other employee
     if (creator?.role === "EMPLOYEE") {
       effectiveAssignedToId = createdById;
+      effectiveAssigneeIds = [createdById];
+    } else {
+      // Admin: ensure primary assignedToId and assigneeIds sync
+      if (!effectiveAssignedToId && effectiveAssigneeIds.length > 0) {
+        effectiveAssignedToId = effectiveAssigneeIds[0];
+      }
+      if (effectiveAssignedToId && !effectiveAssigneeIds.includes(effectiveAssignedToId)) {
+        effectiveAssigneeIds = [effectiveAssignedToId, ...effectiveAssigneeIds];
+      }
+    }
+
+    let effectiveClientId = clientId || null;
+    let effectiveClientIds: string[] = Array.isArray(clientIds) ? clientIds : [];
+    if (!effectiveClientId && effectiveClientIds.length > 0) {
+      effectiveClientId = effectiveClientIds[0];
+    }
+    if (effectiveClientId && !effectiveClientIds.includes(effectiveClientId)) {
+      effectiveClientIds = [effectiveClientId, ...effectiveClientIds];
     }
 
     const isRecurring = recurrence !== "ONE_TIME";
+    const numericBillableHours = billableHours ? parseFloat(billableHours) : 0;
 
     // 1. Create task
     const task = await prisma.task.create({
@@ -130,18 +194,35 @@ export async function POST(request: Request) {
         employeeStatus: "TODO",
         adminStatus: "NOT_SUBMITTED",
         assignedToId: effectiveAssignedToId,
-        clientId: clientId || null,
+        clientId: effectiveClientId,
+        billableHours: numericBillableHours,
         createdById,
         isRecurringTemplate: false,
+        taskClients: effectiveClientIds.length > 0 ? {
+          create: effectiveClientIds.map((cid) => ({ clientId: cid })),
+        } : undefined,
+        assignees: effectiveAssigneeIds.length > 0 ? {
+          create: effectiveAssigneeIds.map((uid) => ({ userId: uid })),
+        } : undefined,
       },
       include: {
         assignedTo: true,
         createdBy: true,
         client: true,
+        taskClients: {
+          include: {
+            client: true,
+          },
+        },
+        assignees: {
+          include: {
+            user: true,
+          },
+        },
       },
     });
 
-    // 2. If recurring, also create a template record so the scheduler can spawn it every morning / scheduled date
+    // 2. If recurring, also create a template record so the scheduler can spawn it
     if (isRecurring) {
       await prisma.task.create({
         data: {
@@ -156,10 +237,17 @@ export async function POST(request: Request) {
           employeeStatus: "TODO",
           adminStatus: "NOT_SUBMITTED",
           assignedToId: effectiveAssignedToId,
-          clientId: clientId || null,
+          clientId: effectiveClientId,
+          billableHours: numericBillableHours,
           createdById,
           isRecurringTemplate: true,
           lastGeneratedDate: new Date(),
+          taskClients: effectiveClientIds.length > 0 ? {
+            create: effectiveClientIds.map((cid) => ({ clientId: cid })),
+          } : undefined,
+          assignees: effectiveAssigneeIds.length > 0 ? {
+            create: effectiveAssigneeIds.map((uid) => ({ userId: uid })),
+          } : undefined,
         },
       });
     }

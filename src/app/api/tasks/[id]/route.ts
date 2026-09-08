@@ -12,6 +12,12 @@ export async function GET(
         assignedTo: true,
         createdBy: true,
         client: true,
+        taskClients: {
+          include: { client: true },
+        },
+        assignees: {
+          include: { user: true },
+        },
         timeLogs: {
           include: { user: true },
           orderBy: { createdAt: "desc" },
@@ -47,12 +53,19 @@ export async function PUT(
       dueDate,
       startDate,
       assignedToId,
+      assigneeIds,
       clientId,
+      clientIds,
+      billableHours,
     } = body;
 
     const existingTask = await prisma.task.findUnique({
       where: { id: params.id },
-      include: { createdBy: true },
+      include: {
+        createdBy: true,
+        assignees: true,
+        taskClients: true,
+      },
     });
 
     if (!existingTask) {
@@ -72,7 +85,9 @@ export async function PUT(
     // Admin can edit any task.
     // Employees can edit tasks assigned to them OR created by them.
     if (!isAdmin) {
-      const isAssignee = existingTask.assignedToId === userId;
+      const isAssignee =
+        existingTask.assignedToId === userId ||
+        existingTask.assignees.some((a) => a.userId === userId);
       const isCreator = existingTask.createdById === userId;
       if (!isAssignee && !isCreator) {
         return NextResponse.json(
@@ -86,6 +101,33 @@ export async function PUT(
     let effectiveAssignedToId = assignedToId;
     if (!isAdmin) {
       effectiveAssignedToId = existingTask.assignedToId || existingTask.createdById;
+    } else if (assigneeIds !== undefined && Array.isArray(assigneeIds)) {
+      effectiveAssignedToId = assigneeIds.length > 0 ? assigneeIds[0] : null;
+    }
+
+    let effectiveClientId = clientId;
+    if (clientIds !== undefined && Array.isArray(clientIds)) {
+      effectiveClientId = clientIds.length > 0 ? clientIds[0] : null;
+    }
+
+    // Handle updating multi-client relations if passed
+    if (clientIds !== undefined && Array.isArray(clientIds)) {
+      await prisma.taskClient.deleteMany({ where: { taskId: params.id } });
+      if (clientIds.length > 0) {
+        await prisma.taskClient.createMany({
+          data: clientIds.map((cid: string) => ({ taskId: params.id, clientId: cid })),
+        });
+      }
+    }
+
+    // Handle updating multi-assignee relations if passed and admin
+    if (isAdmin && assigneeIds !== undefined && Array.isArray(assigneeIds)) {
+      await prisma.taskAssignee.deleteMany({ where: { taskId: params.id } });
+      if (assigneeIds.length > 0) {
+        await prisma.taskAssignee.createMany({
+          data: assigneeIds.map((uid: string) => ({ taskId: params.id, userId: uid })),
+        });
+      }
     }
 
     const updated = await prisma.task.update({
@@ -99,13 +141,24 @@ export async function PUT(
         ...(weeklyDay !== undefined && { weeklyDay: weeklyDay || null }),
         ...(dueDate !== undefined && { dueDate: dueDate ? new Date(dueDate) : null }),
         ...(startDate !== undefined && { startDate: startDate ? new Date(startDate) : null }),
+        ...(billableHours !== undefined && { billableHours: billableHours ? parseFloat(billableHours) : 0 }),
         ...(effectiveAssignedToId !== undefined && { assignedToId: effectiveAssignedToId || null }),
-        ...(clientId !== undefined && { clientId: clientId || null }),
+        ...(effectiveClientId !== undefined && { clientId: effectiveClientId || null }),
       },
       include: {
         assignedTo: true,
         createdBy: true,
         client: true,
+        taskClients: {
+          include: { client: true },
+        },
+        assignees: {
+          include: { user: true },
+        },
+        timeLogs: {
+          include: { user: true },
+          orderBy: { createdAt: "desc" },
+        },
       },
     });
 

@@ -17,6 +17,7 @@ import {
   X,
 } from "lucide-react";
 import { formatDuration } from "@/lib/formatters";
+import { exportToExcel } from "@/lib/excelExport";
 
 interface ReportsViewProps {
   currentUser: User | null;
@@ -114,6 +115,64 @@ export default function ReportsView({ currentUser, allUsers }: ReportsViewProps)
     }
   };
 
+  const handleExportExcel = () => {
+    if (filteredReports.length === 0) return;
+    exportToExcel(
+      `EOD_Report_${date}`,
+      [
+        { header: "Employee Name", formatter: (r: any) => r.employee?.name || "" },
+        { header: "Employee Email", formatter: (r: any) => r.employee?.email || "" },
+        { header: "Designation", formatter: (r: any) => r.employee?.designation || "" },
+        { header: "Date", key: "date" },
+        { header: "Attendance Status", formatter: (r: any) => r.attendance?.status || "" },
+        {
+          header: "Check In",
+          formatter: (r: any) =>
+            r.attendance?.checkInTime
+              ? new Date(r.attendance.checkInTime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+              : "N/A",
+        },
+        {
+          header: "Check Out",
+          formatter: (r: any) =>
+            r.attendance?.checkOutTime
+              ? new Date(r.attendance.checkOutTime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+              : r.attendance?.status === "PRESENT" || r.attendance?.status === "ON_BREAK"
+              ? "In Progress"
+              : "N/A",
+        },
+        {
+          header: "Shift Duration",
+          formatter: (r: any) =>
+            formatDuration(
+              r.shiftDurationSeconds !== undefined
+                ? r.shiftDurationSeconds
+                : r.attendance?.durationMinutes
+                ? r.attendance.durationMinutes * 60
+                : 0
+            ),
+        },
+        {
+          header: "Break Duration",
+          formatter: (r: any) => formatDuration(r.attendance?.breakDurationSeconds || 0),
+        },
+        {
+          header: "Task Time Logged",
+          formatter: (r: any) => formatDuration(r.totalActiveSeconds || 0),
+        },
+        {
+          header: "Tasks Completed",
+          formatter: (r: any) => `${r.totalTasksCompleted || 0} / ${r.tasks?.length || 0}`,
+        },
+        {
+          header: "Task Titles",
+          formatter: (r: any) => (r.tasks || []).map((t: any) => t.title).join("; "),
+        },
+      ],
+      filteredReports
+    );
+  };
+
   // Client-side filtering for activity status and search query
   const filteredReports = reportsData.filter((rep) => {
     if (searchQuery) {
@@ -159,11 +218,21 @@ export default function ReportsView({ currentUser, allUsers }: ReportsViewProps)
         </div>
 
         <div className="flex items-center space-x-3 w-full md:w-auto flex-wrap sm:flex-nowrap">
+          {/* Download Excel Button */}
+          <button
+            disabled={filteredReports.length === 0}
+            onClick={handleExportExcel}
+            className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-bold px-4 py-2.5 rounded-xl text-xs transition shadow-sm flex items-center space-x-1.5 whitespace-nowrap cursor-pointer"
+          >
+            <Download className="w-3.5 h-3.5" />
+            <span>Download Excel</span>
+          </button>
+
           {/* Dispatch Button */}
           <button
             disabled={sending || reportsData.length === 0}
             onClick={() => handleSendToGmail()}
-            className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-bold px-4 py-2.5 rounded-xl text-xs transition shadow-sm flex items-center space-x-1.5 whitespace-nowrap"
+            className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-bold px-4 py-2.5 rounded-xl text-xs transition shadow-sm flex items-center space-x-1.5 whitespace-nowrap cursor-pointer"
           >
             <Send className="w-3.5 h-3.5" />
             <span>{sending ? "Sending via Gmail..." : "Send EOD to Admin Gmail"}</span>
@@ -428,7 +497,7 @@ export default function ReportsView({ currentUser, allUsers }: ReportsViewProps)
                   <div>
                     <h2 className="text-lg font-bold">Daily Work & Task Report</h2>
                     <p className="text-xs text-blue-100 mt-0.5">
-                      nacsconsulting Automated End of Day Summary
+                      Task Management System • End of Day Summary
                     </p>
                   </div>
                   <div className="bg-white/20 px-3 py-1.5 rounded-lg text-xs font-semibold backdrop-blur-xs">
@@ -449,7 +518,7 @@ export default function ReportsView({ currentUser, allUsers }: ReportsViewProps)
                     </span>
                   </div>
 
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2 border-t border-slate-200 text-center">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 pt-2 border-t border-slate-200 text-center">
                     <div className="bg-white p-2 rounded-lg border border-slate-200">
                       <div className="text-[10px] uppercase font-bold text-slate-400">Check In</div>
                       <div className="text-xs font-bold text-slate-800 mt-0.5">
@@ -463,17 +532,35 @@ export default function ReportsView({ currentUser, allUsers }: ReportsViewProps)
                       <div className="text-xs font-bold text-slate-800 mt-0.5">
                         {activeReport.attendance.checkOutTime
                           ? new Date(activeReport.attendance.checkOutTime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
-                          : "Active"}
+                          : (activeReport.attendance.status === "PRESENT" || activeReport.attendance.status === "ON_BREAK") ? "In Progress" : "N/A"}
                       </div>
                     </div>
                     <div className="bg-white p-2 rounded-lg border border-slate-200">
-                      <div className="text-[10px] uppercase font-bold text-slate-400">Timer Total</div>
+                      <div className="text-[10px] uppercase font-bold text-slate-400">Shift Duration</div>
+                      <div className="text-xs font-bold text-indigo-700 font-mono mt-0.5">
+                        {formatDuration(
+                          activeReport.shiftDurationSeconds !== undefined
+                            ? activeReport.shiftDurationSeconds
+                            : activeReport.attendance.durationMinutes
+                            ? activeReport.attendance.durationMinutes * 60
+                            : 0
+                        )}
+                      </div>
+                    </div>
+                    <div className="bg-white p-2 rounded-lg border border-slate-200">
+                      <div className="text-[10px] uppercase font-bold text-slate-400">Break Time</div>
+                      <div className="text-xs font-bold text-amber-600 font-mono mt-0.5">
+                        {formatDuration(activeReport.attendance.breakDurationSeconds || 0)}
+                      </div>
+                    </div>
+                    <div className="bg-white p-2 rounded-lg border border-slate-200">
+                      <div className="text-[10px] uppercase font-bold text-slate-400">Task Time Logged</div>
                       <div className="text-xs font-bold text-blue-600 font-mono mt-0.5">
                         {formatDuration(activeReport.totalActiveSeconds)}
                       </div>
                     </div>
                     <div className="bg-white p-2 rounded-lg border border-slate-200">
-                      <div className="text-[10px] uppercase font-bold text-slate-400">Completed / Total</div>
+                      <div className="text-[10px] uppercase font-bold text-slate-400">Tasks Completed</div>
                       <div className="text-xs font-bold text-emerald-600 mt-0.5">
                         {activeReport.totalTasksCompleted} / {activeReport.tasks.length}
                       </div>

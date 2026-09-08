@@ -74,7 +74,10 @@ export default function RecurringTasksView({
   // For employees, strictly isolate to only their own assigned recurring tasks
   const userTemplates = templates.filter((tpl) => {
     if (!isAdmin) {
-      return tpl.assignedToId === currentUser?.id || tpl.assignedTo?.id === currentUser?.id;
+      const isDirectAssignee = tpl.assignedToId === currentUser?.id || tpl.assignedTo?.id === currentUser?.id;
+      const isMultiAssignee = tpl.assignees && tpl.assignees.some((a: any) => a.userId === currentUser?.id);
+      const isCreator = tpl.createdById === currentUser?.id;
+      return isDirectAssignee || isMultiAssignee || isCreator;
     }
     return true;
   });
@@ -129,24 +132,22 @@ export default function RecurringTasksView({
         </div>
 
         <div className="flex items-center space-x-3 w-full md:w-auto flex-wrap sm:flex-nowrap">
-          {isAdmin && (
-            <button
-              disabled={runningScheduler}
-              onClick={triggerSchedulerCycle}
-              className="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-bold px-4 py-2.5 rounded-xl text-xs transition shadow-md flex items-center space-x-1.5"
-              title="Runs the morning cron engine to generate today's scheduled tasks"
-            >
-              <Sparkles className="w-4 h-4" />
-              <span>{runningScheduler ? "Processing..." : "⚡ Trigger Morning Scheduler"}</span>
-            </button>
-          )}
+          <button
+            disabled={runningScheduler}
+            onClick={triggerSchedulerCycle}
+            className="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-bold px-4 py-2.5 rounded-xl text-xs transition shadow-md flex items-center space-x-1.5 cursor-pointer"
+            title="Spawns all pending recurring tasks for today into your task list immediately"
+          >
+            <Sparkles className="w-4 h-4 text-amber-300" />
+            <span>{runningScheduler ? "Generating..." : "⚡ Generate Today's Tasks Now"}</span>
+          </button>
 
           <button
             onClick={onOpenCreateModal}
-            className="bg-white hover:bg-slate-100 text-slate-900 font-extrabold px-4 py-2.5 rounded-xl text-xs transition shadow-md flex items-center space-x-1.5"
+            className="bg-white hover:bg-slate-100 text-slate-900 font-extrabold px-4 py-2.5 rounded-xl text-xs transition shadow-md flex items-center space-x-1.5 cursor-pointer"
           >
             <Plus className="w-4 h-4 text-blue-600" />
-            <span>+ Add Schedule</span>
+            <span>+ Add Task</span>
           </button>
         </div>
       </div>

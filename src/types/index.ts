@@ -19,7 +19,7 @@ export type AdminStatusType =
   | "FINAL_COMPLETED"
   | "REVISION_REQUESTED";
 
-export type AttendanceStatusType = "PRESENT" | "CHECKED_OUT" | "ABSENT_LEAVE";
+export type AttendanceStatusType = "PRESENT" | "ON_BREAK" | "CHECKED_OUT" | "ABSENT_LEAVE";
 
 export interface User {
   id: string;
@@ -58,6 +58,20 @@ export interface Client {
   };
 }
 
+export interface TaskAssigneeItem {
+  id: string;
+  taskId: string;
+  userId: string;
+  user?: User;
+}
+
+export interface TaskClientItem {
+  id: string;
+  taskId: string;
+  clientId: string;
+  client?: Client;
+}
+
 export interface Task {
   id: string;
   title: string;
@@ -73,13 +87,16 @@ export interface Task {
   totalDurationSeconds: number;
   isTimerRunning: boolean;
   currentTimerStartedAt?: string | null;
+  billableHours?: number | null;
   isRecurringTemplate: boolean;
   parentRecurringId?: string | null;
   lastGeneratedDate?: string | null;
   assignedToId?: string | null;
   assignedTo?: User | null;
+  assignees?: TaskAssigneeItem[];
   clientId?: string | null;
   client?: Client | null;
+  taskClients?: TaskClientItem[];
   createdById: string;
   createdBy?: User | null;
   timeLogs?: TimeLog[];
@@ -94,6 +111,9 @@ export interface AttendanceRecord {
   checkInTime?: string | null;
   checkOutTime?: string | null;
   workDurationSeconds: number;
+  breakDurationSeconds?: number;
+  isOnBreak?: boolean;
+  currentBreakStartedAt?: string | null;
   status: AttendanceStatusType;
   notes?: string | null;
 }
@@ -105,6 +125,9 @@ export interface AttendanceRosterItem {
   checkInTime?: string | null;
   checkOutTime?: string | null;
   workDurationSeconds: number;
+  breakDurationSeconds?: number;
+  isOnBreak?: boolean;
+  currentBreakStartedAt?: string | null;
 }
 
 export interface TaskReportItem {
@@ -115,6 +138,7 @@ export interface TaskReportItem {
   employeeStatus: string;
   adminStatus: string;
   durationSeconds: number;
+  billableHours?: number | null;
 }
 
 export interface EmployeeDailyReportData {
@@ -130,8 +154,11 @@ export interface EmployeeDailyReportData {
     checkInTime?: string | null;
     checkOutTime?: string | null;
     workDurationSeconds: number;
+    breakDurationSeconds?: number;
+    isOnBreak?: boolean;
   };
   tasks: TaskReportItem[];
+  shiftDurationSeconds: number;
   totalActiveSeconds: number;
   totalTasksCompleted: number;
   totalTasksPending: number;
