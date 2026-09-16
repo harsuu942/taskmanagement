@@ -497,7 +497,7 @@ export default function ReportsView({ currentUser, allUsers }: ReportsViewProps)
                   <div>
                     <h2 className="text-lg font-bold">Daily Work & Task Report</h2>
                     <p className="text-xs text-blue-100 mt-0.5">
-                      Task Management System • End of Day Summary
+                      nacsconsulting Automated End of Day Summary
                     </p>
                   </div>
                   <div className="bg-white/20 px-3 py-1.5 rounded-lg text-xs font-semibold backdrop-blur-xs">

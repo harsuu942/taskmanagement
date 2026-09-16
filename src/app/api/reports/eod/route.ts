@@ -248,7 +248,7 @@ export async function POST(request: Request) {
       };
 
       const htmlContent = generateReportHtml(reportData);
-      const subject = `[Daily Work Report] ${emp.name} - ${date} (${totalTasksCompleted} Completed, Shift: ${formatDurationSecs(shiftDurationSeconds)})`;
+      const subject = `[nacsconsulting EOD Report] ${emp.name} - ${date} (${totalTasksCompleted} Completed, Shift: ${formatDurationSecs(shiftDurationSeconds)})`;
 
       // Dispatch Email via Gmail
       const emailRes = await sendEmailReport(targetAdminEmail, subject, htmlContent);

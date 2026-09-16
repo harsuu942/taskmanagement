@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Task Management | Task & Attendance Management System",
-  description: "Enterprise task management with dual-tier approvals, task timers, attendance tracking, and Gmail EOD reporting.",
+  title: "nacsconsulting | Task & Attendance Management System",
+  description: "Enterprise task management with dual-tier approvals, task timers, attendance tracking, and Gmail EOD reporting for nacsconsulting.",
 };
 
 export default function RootLayout({

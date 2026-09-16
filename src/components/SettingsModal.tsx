@@ -547,7 +547,7 @@ export default function SettingsModal({
               <ol className="list-decimal list-inside text-[11px] text-slate-600 space-y-1 bg-white p-2.5 rounded-lg border border-slate-200">
                 <li>Go to <strong className="text-slate-800">myaccount.google.com/security</strong>.</li>
                 <li>Ensure <strong className="text-slate-800">2-Step Verification</strong> is turned ON.</li>
-                <li>Search or click <strong className="text-slate-800">App Passwords</strong>, name it <code className="text-blue-700 bg-blue-50 px-1 py-0.5 rounded">TaskManagement</code>, and paste the 16 letters above.</li>
+                <li>Search or click <strong className="text-slate-800">App Passwords</strong>, name it <code className="text-blue-700 bg-blue-50 px-1 py-0.5 rounded">nacsconsulting</code>, and paste the 16 letters above.</li>
               </ol>
             </div>
 

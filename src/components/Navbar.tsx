@@ -193,17 +193,35 @@ export default function Navbar({
       {/* Brand & Action Bar */}
       <div className="w-full px-4 sm:px-6 lg:px-8 border-b border-slate-100">
         <div className="flex items-center justify-between h-16 py-2 gap-3">
-          {/* Official Logo */}
-          <div className="flex items-center flex-shrink-0">
-            <div className="p-1 rounded-xl bg-slate-50 border border-slate-200 shadow-2xs">
+          {/* Official Logo from nacsconsulting.com */}
+          <div className="flex items-center space-x-3 flex-shrink-0">
+            <div className="p-1 rounded-xl bg-white border border-slate-200 shadow-2xs flex items-center">
               <img
                 src="/logo.png"
-                alt="Task Management Logo"
+                alt="nacsconsulting"
                 className="h-10 w-auto max-w-[180px] sm:max-w-[220px] object-contain"
                 onError={(e) => {
                   (e.target as HTMLElement).style.display = "none";
+                  const fallback = document.getElementById("nacs-nav-fallback");
+                  if (fallback) fallback.style.display = "flex";
                 }}
               />
+              <div id="nacs-nav-fallback" style={{ display: "none" }} className="items-center space-x-2 px-2 py-1">
+                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-600 to-blue-900 text-white font-black text-xs flex items-center justify-center shadow-xs">
+                  NACS
+                </div>
+                <span className="text-sm font-black tracking-tight text-slate-900">
+                  <span className="text-emerald-600">NACS</span> <span className="text-blue-900">CONSULTING</span>
+                </span>
+              </div>
+            </div>
+            <div className="hidden lg:flex flex-col">
+              <span className="text-sm font-black tracking-tight text-slate-900 leading-tight">
+                <span className="text-emerald-600">NACS</span> <span className="text-blue-900">CONSULTING</span>
+              </span>
+              <span className="text-[10px] font-semibold text-slate-400 tracking-wider uppercase">
+                Navkar Accounting &amp; Consultancy Services
+              </span>
             </div>
           </div>
 

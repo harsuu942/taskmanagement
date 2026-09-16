@@ -64,16 +64,29 @@ export default function LoginView({ onLogin }: LoginViewProps) {
         <div className="bg-gradient-to-r from-slate-900 via-blue-950 to-indigo-950 text-white p-7 text-center relative overflow-hidden">
           <div className="relative z-10 flex flex-col items-center">
             {/* Logo Image */}
-            <div className="bg-white p-3 rounded-2xl shadow-lg">
+            <div className="bg-white p-3 rounded-2xl shadow-lg mb-3">
               <img
                 src="/logo.png"
-                alt="Task Management Logo"
-                className="h-12 w-auto object-contain"
+                alt="nacsconsulting"
+                className="h-14 w-auto object-contain"
                 onError={(e) => {
                   (e.target as HTMLElement).style.display = "none";
+                  const fb = document.getElementById("nacs-login-fallback");
+                  if (fb) fb.style.display = "flex";
                 }}
               />
+              <div id="nacs-login-fallback" style={{ display: "none" }} className="items-center space-x-2 px-3 py-1">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-600 to-blue-900 text-white font-black text-sm flex items-center justify-center shadow-md">
+                  NACS
+                </div>
+              </div>
             </div>
+            <h1 className="text-xl font-black tracking-tight text-white mt-1">
+              <span className="text-emerald-400">NACS</span> CONSULTING
+            </h1>
+            <p className="text-xs text-blue-200 mt-0.5 font-medium">
+              Navkar Accounting &amp; Consultancy Services
+            </p>
           </div>
         </div>
 
@@ -154,7 +167,7 @@ export default function LoginView({ onLogin }: LoginViewProps) {
 
         {/* Footer */}
         <div className="px-6 py-3.5 bg-slate-50 border-t border-slate-100 text-center text-[11px] text-slate-500">
-          Task Management Portal &bull; Secure Authentication
+          Navkar Accounting &amp; Consultancy Services (nacsconsulting) &bull; Secure Authentication
         </div>
       </div>
     </div>

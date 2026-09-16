@@ -43,12 +43,12 @@ export async function POST(request: Request) {
     // Optional Action: Test Gmail SMTP Connection
     if (action === "test-email") {
       const recipient = testRecipient || adminEmail || "gaurav141@gmail.com";
-      const testSubject = "[Task Management] Test Email - Gmail SMTP Configuration Verified";
+      const testSubject = "[nacsconsulting] Test Email - Gmail SMTP Configuration Verified";
       const testHtml = `
         <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #f8fafc; padding: 24px; color: #1e293b;">
           <div style="max-width: 520px; margin: 0 auto; background: #ffffff; border-radius: 12px; border: 1px solid #e2e8f0; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
             <div style="background: linear-gradient(135deg, #1d4ed8, #2563eb); padding: 20px 24px; color: white;">
-              <h2 style="margin: 0; font-size: 18px; font-weight: bold;">Task Management - SMTP Test</h2>
+              <h2 style="margin: 0; font-size: 18px; font-weight: bold;">nacsconsulting - SMTP Test</h2>
               <p style="margin: 4px 0 0; font-size: 12px; opacity: 0.9;">Automated Notification Verification</p>
             </div>
             <div style="padding: 24px;">

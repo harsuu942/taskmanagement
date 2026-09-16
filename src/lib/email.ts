@@ -68,8 +68,8 @@ export function generateReportHtml(data: EmployeeDailyReportData): string {
         <table style="width: 100%;">
           <tr>
             <td>
-              <h1 style="margin: 0; font-size: 22px; font-weight: 700; letter-spacing: -0.5px;">Daily Work & Task Report</h1>
-              <p style="margin: 6px 0 0 0; opacity: 0.9; font-size: 13px;">Automated End of Day Summary</p>
+              <h1 style="margin: 0; font-size: 22px; font-weight: 700; letter-spacing: -0.5px;">nacsconsulting - Daily Employee Report</h1>
+              <p style="margin: 6px 0 0 0; opacity: 0.9; font-size: 13px;">nacsconsulting Automated End of Day Summary</p>
             </td>
             <td style="text-align: right;">
               <div style="background: rgba(255, 255, 255, 0.2); padding: 6px 14px; border-radius: 20px; display: inline-block; font-size: 12px; font-weight: 600;">
@@ -147,7 +147,7 @@ export function generateReportHtml(data: EmployeeDailyReportData): string {
 
       <!-- Footer Note -->
       <div style="background: #F4F5F7; padding: 16px 32px; border-top: 1px solid #EBECF0; font-size: 12px; color: #6B778C; text-align: center;">
-        This report was automatically compiled by Task Management Portal.<br>
+        This report was automatically compiled by nacsconsulting Task Management System.<br>
         Admin review: Tasks marked as 'Pending Review' can be finalized in the Admin Dashboard.
       </div>
     </div>
@@ -209,7 +209,7 @@ export async function sendEmailReport(
       });
 
       const info = await transporter.sendMail({
-        from: `"Task Management Portal" <${gmailUser}>`,
+        from: `"nacsconsulting Manager" <${gmailUser}>`,
         to: toEmail,
         subject: subject,
         html: htmlContent,

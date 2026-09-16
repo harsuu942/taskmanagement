@@ -333,7 +333,7 @@ export default function Home() {
     return (
       <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center text-slate-500">
         <div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mb-3"></div>
-        <span className="font-semibold text-sm">Loading Task Management portal...</span>
+        <span className="font-semibold text-sm">Loading nacsconsulting portal...</span>
       </div>
     );
   }
@@ -350,7 +350,7 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col w-full">
-      {/* Portal Header Navigation with Logo & Completed Tasks tab */}
+      {/* nacsconsulting Header Navigation with Logo & Completed Tasks tab */}
       <Navbar
         currentUser={currentUser}
         allUsers={allUsers}
