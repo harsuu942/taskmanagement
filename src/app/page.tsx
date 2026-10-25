@@ -432,6 +432,7 @@ export default function Home() {
             onTimerAction={handleTimerAction}
             onAdminApprove={handleAdminApprove}
             onAdminRevision={handleAdminRevision}
+            onTasksUpdated={fetchTasks}
           />
         )}
 

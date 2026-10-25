@@ -19,7 +19,7 @@ export type AdminStatusType =
   | "FINAL_COMPLETED"
   | "REVISION_REQUESTED";
 
-export type AttendanceStatusType = "PRESENT" | "ON_BREAK" | "CHECKED_OUT" | "ABSENT_LEAVE";
+export type AttendanceStatusType = "PRESENT" | "ON_BREAK" | "CHECKED_OUT" | "ABSENT_LEAVE" | "ON_LEAVE" | "PUBLIC_HOLIDAY";
 
 export interface User {
   id: string;
@@ -72,6 +72,17 @@ export interface TaskClientItem {
   client?: Client;
 }
 
+export interface TaskProof {
+  id: string;
+  taskId: string;
+  userId: string;
+  user?: User;
+  imageUrl: string;
+  caption?: string | null;
+  source: string; // "WEB_CAPTURE" | "MANUAL_UPLOAD" | "DESKTOP_AGENT"
+  createdAt: string;
+}
+
 export interface Task {
   id: string;
   title: string;
@@ -100,6 +111,7 @@ export interface Task {
   createdById: string;
   createdBy?: User | null;
   timeLogs?: TimeLog[];
+  proofs?: TaskProof[];
   createdAt: string;
   updatedAt: string;
 }
@@ -125,6 +137,7 @@ export interface AttendanceRosterItem {
   employee: User;
   record: AttendanceRecord | null;
   status: AttendanceStatusType;
+  holidayName?: string | null;
   checkInTime?: string | null;
   checkOutTime?: string | null;
   workDurationSeconds: number;
@@ -133,6 +146,15 @@ export interface AttendanceRosterItem {
   currentBreakStartedAt?: string | null;
   lastCheckInTime?: string | null;
   sessionBreakDurationSeconds?: number;
+}
+
+export interface Holiday {
+  id: string;
+  date: string; // YYYY-MM-DD
+  name: string;
+  description?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface TaskReportItem {

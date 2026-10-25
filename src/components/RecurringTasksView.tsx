@@ -12,6 +12,7 @@ import {
   Plus,
   RefreshCw,
   Sparkles,
+  Trash2,
 } from "lucide-react";
 
 interface RecurringTasksViewProps {
@@ -66,6 +67,25 @@ export default function RecurringTasksView({
       setScheduleResult({ success: false, error: e.message });
     } finally {
       setRunningScheduler(false);
+    }
+  };
+
+  const handleDeleteTemplate = async (templateId: string, title: string) => {
+    if (!confirm(`Are you sure you want to delete the recurring template "${title}"? Future automatic task generation for this schedule will be stopped.`)) {
+      return;
+    }
+    try {
+      const res = await fetch(`/api/tasks/${templateId}?userId=${currentUser?.id}&role=${currentUser?.role}`, {
+        method: "DELETE",
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        alert(data.error || "Failed to delete recurring template");
+        return;
+      }
+      fetchTemplates();
+    } catch (e: any) {
+      alert(e.message || "Error deleting recurring template");
     }
   };
 
@@ -296,13 +316,14 @@ export default function RecurringTasksView({
                 <th className="py-3 px-4">Schedule / Rule</th>
                 <th className="py-3 px-4">Priority</th>
                 <th className="py-3 px-4">Assigned Staff</th>
-                <th className="py-3 px-4 text-right">Last Generated</th>
+                <th className="py-3 px-4 text-center">Last Generated</th>
+                <th className="py-3 px-4 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200">
               {filteredTemplates.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="py-12 text-center text-slate-400">
+                  <td colSpan={7} className="py-12 text-center text-slate-400">
                     {isAdmin
                       ? "No recurring templates match your search filter. Click \"+ Add Schedule\" to configure one."
                       : "No recurring task schedules found for you. Click \"+ Add Schedule\" to create a recurring task."}
@@ -411,7 +432,7 @@ export default function RecurringTasksView({
                       )}
                     </td>
 
-                    <td className="py-3.5 px-4 text-right text-slate-500 font-medium">
+                    <td className="py-3.5 px-4 text-center text-slate-500 font-medium">
                       {tpl.lastGeneratedDate ? (
                         <div>
                           <div className="font-semibold text-slate-800">
@@ -430,6 +451,17 @@ export default function RecurringTasksView({
                       ) : (
                         <span className="text-slate-400 italic">Pending First Cycle</span>
                       )}
+                    </td>
+
+                    <td className="py-3.5 px-4 text-right whitespace-nowrap">
+                      <button
+                        onClick={() => handleDeleteTemplate(tpl.id, tpl.title)}
+                        className="inline-flex items-center space-x-1 px-2.5 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-lg text-xs font-semibold transition cursor-pointer"
+                        title="Delete recurring template"
+                      >
+                        <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+                        <span>Delete</span>
+                      </button>
                     </td>
                   </tr>
                 ))

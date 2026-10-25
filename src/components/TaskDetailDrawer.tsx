@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Task, User, TimeLog, Client, PriorityType, RecurrenceType } from "@/types";
+import { Task, User, TimeLog, Client, PriorityType, RecurrenceType, TaskProof } from "@/types";
 import {
   X,
   Play,
@@ -25,6 +25,10 @@ import {
   Maximize2,
   Plus,
   Users,
+  Camera,
+  UploadCloud,
+  ExternalLink,
+  Image as ImageIcon,
 } from "lucide-react";
 import { formatDuration } from "@/lib/formatters";
 
@@ -65,8 +69,162 @@ export default function TaskDetailDrawer({
   const [manualDurationMinutes, setManualDurationMinutes] = useState("");
   const [manualLogNote, setManualLogNote] = useState("");
   const [manualLogDate, setManualLogDate] = useState(new Date().toISOString().slice(0, 10));
+  const [manualLogTargetUserId, setManualLogTargetUserId] = useState("");
   const [manualLogLoading, setManualLogLoading] = useState(false);
   const [manualLogError, setManualLogError] = useState<string | null>(null);
+
+  // Admin Direct Time Override state
+  const [showAdminTimeEdit, setShowAdminTimeEdit] = useState(false);
+  const [adminTotalHours, setAdminTotalHours] = useState("");
+  const [adminTotalMins, setAdminTotalMins] = useState("");
+  const [adminTimeTargetUser, setAdminTimeTargetUser] = useState("");
+  const [adminTimeNote, setAdminTimeNote] = useState("");
+  const [adminTimeLoading, setAdminTimeLoading] = useState(false);
+  const [adminTimeError, setAdminTimeError] = useState<string | null>(null);
+
+  // Task Proofs & Screenshot state
+  const [proofsList, setProofsList] = useState<TaskProof[]>([]);
+  const [capturingScreen, setCapturingScreen] = useState(false);
+  const [uploadingProof, setUploadingProof] = useState(false);
+  const [selectedProof, setSelectedProof] = useState<TaskProof | null>(null);
+
+  const fetchProofs = async () => {
+    if (!task) return;
+    try {
+      const res = await fetch(`/api/tasks/${task.id}/proofs`);
+      const data = await res.json();
+      if (res.ok && data.proofs) {
+        setProofsList(data.proofs);
+      }
+    } catch (e) {
+      console.error("Error fetching proofs:", e);
+    }
+  };
+
+  const handleCaptureScreen = async () => {
+    if (!task) return;
+    try {
+      setCapturingScreen(true);
+      // Request screen capture from browser
+      const stream = await navigator.mediaDevices.getDisplayMedia({
+        video: { cursor: "always" } as any,
+      });
+
+      const video = document.createElement("video");
+      video.srcObject = stream;
+      await video.play();
+
+      const canvas = document.createElement("canvas");
+      canvas.width = video.videoWidth || 1280;
+      canvas.height = video.videoHeight || 720;
+      const ctx = canvas.getContext("2d");
+      ctx?.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+      const dataUrl = canvas.toDataURL("image/jpeg", 0.7);
+
+      // Stop all tracks immediately
+      stream.getTracks().forEach((track) => track.stop());
+
+      // Save to server
+      const res = await fetch(`/api/tasks/${task.id}/proofs`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          imageUrl: dataUrl,
+          source: "WEB_CAPTURE",
+          caption: `Screen proof • ${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`,
+          userId: currentUser?.id,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to save screenshot");
+      await fetchProofs();
+      onTaskUpdated();
+    } catch (err: any) {
+      if (err.name !== "NotAllowedError") {
+        alert(err.message || "Screen capture canceled or error occurred");
+      }
+    } finally {
+      setCapturingScreen(false);
+    }
+  };
+
+  const handleUploadImageFile = async (file: File) => {
+    if (!task) return;
+    if (!file.type.startsWith("image/")) {
+      alert("Please upload an image file (PNG, JPG, WEBP).");
+      return;
+    }
+    try {
+      setUploadingProof(true);
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        const rawData = e.target?.result as string;
+        if (!rawData) return;
+
+        const img = new Image();
+        img.onload = async () => {
+          const maxDim = 1600;
+          let width = img.width;
+          let height = img.height;
+          if (width > maxDim || height > maxDim) {
+            if (width > height) {
+              height = Math.round((height * maxDim) / width);
+              width = maxDim;
+            } else {
+              width = Math.round((width * maxDim) / height);
+              height = maxDim;
+            }
+          }
+          const canvas = document.createElement("canvas");
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext("2d");
+          ctx?.drawImage(img, 0, 0, width, height);
+          const compressedData = canvas.toDataURL("image/jpeg", 0.75);
+
+          const res = await fetch(`/api/tasks/${task.id}/proofs`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              imageUrl: compressedData,
+              source: "MANUAL_UPLOAD",
+              caption: file.name.slice(0, 50),
+              userId: currentUser?.id,
+            }),
+          });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || "Failed to upload image");
+          await fetchProofs();
+          onTaskUpdated();
+          setUploadingProof(false);
+        };
+        img.src = rawData;
+      };
+      reader.readAsDataURL(file);
+    } catch (err: any) {
+      alert(err.message || "Failed to process image");
+      setUploadingProof(false);
+    }
+  };
+
+  const handleDeleteProof = async (proofId: string) => {
+    if (!task) return;
+    if (!confirm("Are you sure you want to delete this screenshot proof?")) return;
+    try {
+      const res = await fetch(`/api/tasks/${task.id}/proofs?proofId=${proofId}`, {
+        method: "DELETE",
+      });
+      if (res.ok) {
+        await fetchProofs();
+        onTaskUpdated();
+        if (selectedProof?.id === proofId) setSelectedProof(null);
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
 
   // Edit form fields
   const [editTitle, setEditTitle] = useState("");
@@ -93,10 +251,21 @@ export default function TaskDetailDrawer({
       setEditDueDate(task.dueDate ? new Date(task.dueDate).toISOString().slice(0, 16) : "");
       setEditAssignedToId(task.assignedToId || "");
       setEditClientId(task.clientId || "");
+      setManualLogTargetUserId(task.assignedToId || currentUser?.id || "");
+      const totalSecs = task.totalDurationSeconds || 0;
+      setAdminTotalHours(Math.floor(totalSecs / 3600).toString());
+      setAdminTotalMins(Math.floor((totalSecs % 3600) / 60).toString());
+      setAdminTimeTargetUser(task.assignedToId || currentUser?.id || "");
+      setShowAdminTimeEdit(false);
       setIsEditing(false);
       setEditError(null);
+      if (task.proofs) {
+        setProofsList(task.proofs);
+      } else {
+        fetchProofs();
+      }
     }
-  }, [task]);
+  }, [task, currentUser]);
 
   // Live stopwatch counter
   useEffect(() => {
@@ -235,6 +404,7 @@ export default function TaskDetailDrawer({
           note: manualLogNote.trim() || "Manual time entry",
           logDate: manualLogDate,
           userId: currentUser?.id,
+          targetUserId: manualLogTargetUserId || task.assignedToId || currentUser?.id,
         }),
       });
       const data = await res.json();
@@ -247,6 +417,37 @@ export default function TaskDetailDrawer({
       setManualLogError(err.message);
     } finally {
       setManualLogLoading(false);
+    }
+  };
+
+  const handleAdminSaveTotalTime = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const h = parseInt(adminTotalHours || "0", 10);
+    const m = parseInt(adminTotalMins || "0", 10);
+    const totalSecs = Math.max(0, h * 3600 + m * 60);
+
+    setAdminTimeLoading(true);
+    setAdminTimeError(null);
+    try {
+      const res = await fetch(`/api/tasks/${task.id}/timer`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "admin_set_time",
+          totalDurationSeconds: totalSecs,
+          targetUserId: adminTimeTargetUser || task.assignedToId || currentUser?.id,
+          note: adminTimeNote.trim() || `Admin adjusted duration to ${h}h ${m}m`,
+          userId: currentUser?.id,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to update duration");
+      setShowAdminTimeEdit(false);
+      onTaskUpdated();
+    } catch (err: any) {
+      setAdminTimeError(err.message);
+    } finally {
+      setAdminTimeLoading(false);
     }
   };
 
@@ -750,8 +951,17 @@ export default function TaskDetailDrawer({
                   {formatTimerClock(liveSeconds)}
                 </div>
 
-                <p className="text-[11px] text-slate-400 mt-1">
-                  Total cumulative logged time for this task: {formatDuration(task.totalDurationSeconds)}
+                <p className="text-[11px] text-slate-400 mt-1 flex items-center gap-2 flex-wrap">
+                  <span>Total cumulative logged time: {formatDuration(task.totalDurationSeconds)}</span>
+                  {isAdmin && (
+                    <button
+                      type="button"
+                      onClick={() => setShowAdminTimeEdit(!showAdminTimeEdit)}
+                      className="text-amber-400 hover:text-amber-300 font-bold underline text-[11px] cursor-pointer"
+                    >
+                      {showAdminTimeEdit ? "Close Adjustment" : "👑 Admin Adjust Duration"}
+                    </button>
+                  )}
                 </p>
               </div>
 
@@ -800,6 +1010,87 @@ export default function TaskDetailDrawer({
               </div>
             </div>
 
+            {/* Admin Direct Duration Override Form */}
+            {showAdminTimeEdit && isAdmin && (
+              <form
+                onSubmit={handleAdminSaveTotalTime}
+                className="mt-3 p-3.5 bg-amber-950/50 border border-amber-500/50 rounded-xl space-y-3"
+              >
+                <div className="text-xs font-bold text-amber-300 flex items-center gap-1.5">
+                  <ShieldCheck className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Admin Direct Duration Adjustment (If employee forgot to start timer)</span>
+                </div>
+                {adminTimeError && (
+                  <div className="text-xs text-rose-400 bg-rose-950/40 p-2 rounded border border-rose-800">
+                    {adminTimeError}
+                  </div>
+                )}
+                <div className="grid grid-cols-1 sm:grid-cols-4 gap-2">
+                  <div>
+                    <label className="block text-[10px] uppercase font-bold text-amber-300 mb-1">Hours</label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={adminTotalHours}
+                      onChange={(e) => setAdminTotalHours(e.target.value)}
+                      className="w-full px-2.5 py-1.5 text-xs bg-slate-900 border border-amber-500/40 rounded-lg text-white font-mono"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] uppercase font-bold text-amber-300 mb-1">Minutes</label>
+                    <input
+                      type="number"
+                      min="0"
+                      max="59"
+                      value={adminTotalMins}
+                      onChange={(e) => setAdminTotalMins(e.target.value)}
+                      className="w-full px-2.5 py-1.5 text-xs bg-slate-900 border border-amber-500/40 rounded-lg text-white font-mono"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] uppercase font-bold text-amber-300 mb-1">Attribute To</label>
+                    <select
+                      value={adminTimeTargetUser}
+                      onChange={(e) => setAdminTimeTargetUser(e.target.value)}
+                      className="w-full px-2.5 py-1.5 text-xs bg-slate-900 border border-amber-500/40 rounded-lg text-white"
+                    >
+                      {allUsers.map((u) => (
+                        <option key={u.id} value={u.id}>
+                          {u.name} ({u.role})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-[10px] uppercase font-bold text-amber-300 mb-1">Adjustment Reason</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Employee forgot timer"
+                      value={adminTimeNote}
+                      onChange={(e) => setAdminTimeNote(e.target.value)}
+                      className="w-full px-2.5 py-1.5 text-xs bg-slate-900 border border-amber-500/40 rounded-lg text-white"
+                    />
+                  </div>
+                </div>
+                <div className="flex justify-end gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => setShowAdminTimeEdit(false)}
+                    className="px-3 py-1 text-xs text-slate-400 hover:text-white"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={adminTimeLoading}
+                    className="px-4 py-1.5 text-xs font-bold bg-amber-500 hover:bg-amber-600 text-slate-950 rounded-lg transition cursor-pointer"
+                  >
+                    {adminTimeLoading ? "Saving..." : "Apply Duration Override"}
+                  </button>
+                </div>
+              </form>
+            )}
+
             {/* Quick Toggle: Log Time Manually */}
             <div className="mt-4 pt-3 border-t border-slate-800 flex items-center justify-between">
               <span className="text-xs text-slate-400">Prefer entering hours manually?</span>
@@ -827,6 +1118,25 @@ export default function TaskDetailDrawer({
                 {manualLogError && (
                   <div className="text-xs text-rose-400 bg-rose-950/40 p-2 rounded border border-rose-800">
                     {manualLogError}
+                  </div>
+                )}
+
+                {isAdmin && (
+                  <div>
+                    <label className="block text-[10px] uppercase font-bold text-slate-400 mb-1">
+                      Log on Behalf Of Employee:
+                    </label>
+                    <select
+                      value={manualLogTargetUserId}
+                      onChange={(e) => setManualLogTargetUserId(e.target.value)}
+                      className="w-full px-2.5 py-1.5 text-xs bg-slate-900 border border-slate-700 rounded-lg text-white outline-none font-medium"
+                    >
+                      {allUsers.map((u) => (
+                        <option key={u.id} value={u.id}>
+                          {u.name} ({u.email})
+                        </option>
+                      ))}
+                    </select>
                   </div>
                 )}
 
@@ -1047,6 +1357,109 @@ export default function TaskDetailDrawer({
               </div>
             )}
           </div>
+
+          {/* Work Proofs & Screenshots Section */}
+          <div className="space-y-3 pt-2">
+            <div className="flex items-center justify-between border-b border-slate-200 pb-2 flex-wrap gap-2">
+              <div className="flex items-center space-x-1.5 text-xs font-bold text-slate-800">
+                <Camera className="w-4 h-4 text-purple-600" />
+                <span>Work Proofs & Screenshots ({proofsList.length})</span>
+              </div>
+
+              {/* Action buttons */}
+              <div className="flex items-center space-x-2">
+                <button
+                  type="button"
+                  disabled={capturingScreen}
+                  onClick={handleCaptureScreen}
+                  className="flex items-center space-x-1.5 px-3 py-1.5 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white rounded-lg text-xs font-bold transition shadow-xs cursor-pointer"
+                  title="Capture live screen snapshot as proof of work"
+                >
+                  <Camera className="w-3.5 h-3.5" />
+                  <span>{capturingScreen ? "Capturing..." : "Capture Screen"}</span>
+                </button>
+
+                <label
+                  className="flex items-center space-x-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 rounded-lg text-xs font-bold transition shadow-2xs cursor-pointer"
+                  title="Upload screenshot or work picture from file"
+                >
+                  <UploadCloud className="w-3.5 h-3.5 text-slate-500" />
+                  <span>{uploadingProof ? "Uploading..." : "Upload Proof"}</span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) handleUploadImageFile(file);
+                      e.target.value = "";
+                    }}
+                  />
+                </label>
+              </div>
+            </div>
+
+            <p className="text-[11px] text-slate-400">
+              💡 Tip: Click &ldquo;Capture Screen&rdquo; to take a live window snapshot, or upload screenshots from your computer.
+            </p>
+
+            {proofsList.length > 0 ? (
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                {proofsList.map((proof) => (
+                  <div
+                    key={proof.id}
+                    className="group relative bg-white border border-slate-200 rounded-xl overflow-hidden shadow-2xs hover:shadow-md transition flex flex-col"
+                  >
+                    {/* Thumbnail */}
+                    <div
+                      onClick={() => setSelectedProof(proof)}
+                      className="aspect-video bg-slate-900 cursor-pointer overflow-hidden relative"
+                    >
+                      <img
+                        src={proof.imageUrl}
+                        alt={proof.caption || "Task proof"}
+                        className="w-full h-full object-cover group-hover:scale-105 transition duration-200"
+                      />
+                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition flex items-center justify-center text-white text-xs font-bold">
+                        <ExternalLink className="w-4 h-4 mr-1" />
+                        <span>View Full</span>
+                      </div>
+                    </div>
+
+                    {/* Metadata */}
+                    <div className="p-2.5 flex-1 flex flex-col justify-between text-xs space-y-1">
+                      <div className="font-semibold text-slate-800 text-[11px] truncate" title={proof.caption || "Proof of Work"}>
+                        {proof.caption || "Proof of Work"}
+                      </div>
+                      <div className="flex items-center justify-between text-[10px] text-slate-500 pt-1 border-t border-slate-100">
+                        <span>{proof.user?.name || "Staff"}</span>
+                        <span>{new Date(proof.createdAt).toLocaleDateString([], { month: "short", day: "numeric" })}</span>
+                      </div>
+                    </div>
+
+                    {/* Delete button (Admin or owner) */}
+                    {(isAdmin || proof.userId === currentUser?.id) && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteProof(proof.id);
+                        }}
+                        className="absolute top-1.5 right-1.5 p-1 bg-black/60 hover:bg-rose-600 text-white rounded-md opacity-0 group-hover:opacity-100 transition cursor-pointer"
+                        title="Delete proof"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-5 text-slate-400 text-xs bg-slate-50 rounded-lg border border-dashed border-slate-200">
+                No screenshots or work proofs recorded for this task yet.
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Sticky Bottom Bar with explicit Close button */}
@@ -1067,6 +1480,42 @@ export default function TaskDetailDrawer({
           </button>
         </div>
       </div>
+
+      {/* Proof Lightbox Modal */}
+      {selectedProof && (
+        <div
+          onClick={() => setSelectedProof(null)}
+          className="fixed inset-0 z-60 bg-black/80 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-200"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="max-w-4xl w-full bg-slate-900 rounded-2xl overflow-hidden shadow-2xl border border-slate-700 flex flex-col max-h-[90vh]"
+          >
+            <div className="p-3 bg-slate-800 text-white flex items-center justify-between border-b border-slate-700">
+              <div className="text-xs">
+                <span className="font-bold">{selectedProof.caption || "Task Screen Proof"}</span>
+                <span className="text-slate-400 ml-2">
+                  Captured by {selectedProof.user?.name || "Staff"} on {new Date(selectedProof.createdAt).toLocaleString()}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedProof(null)}
+                className="p-1 text-slate-400 hover:text-white rounded-lg hover:bg-slate-700 transition cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-3 overflow-auto flex items-center justify-center bg-black/90">
+              <img
+                src={selectedProof.imageUrl}
+                alt={selectedProof.caption || "Full resolution proof"}
+                className="max-h-[75vh] w-auto object-contain rounded-lg shadow-lg"
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

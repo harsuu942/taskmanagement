@@ -106,6 +106,14 @@ export async function GET(request: Request) {
           orderBy: { createdAt: "desc" },
           take: 10,
         },
+        proofs: {
+          include: {
+            user: {
+              select: { id: true, name: true, email: true, role: true },
+            },
+          },
+          orderBy: { createdAt: "desc" },
+        },
       },
       orderBy: [
         { priority: "desc" },
@@ -253,6 +261,90 @@ export async function POST(request: Request) {
     }
 
     return NextResponse.json({ success: true, task });
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+}
+
+// Bulk Actions: Batch Approve
+export async function PATCH(request: Request) {
+  try {
+    const body = await request.json();
+    const { taskIds, action, userId, role } = body;
+
+    if (!Array.isArray(taskIds) || taskIds.length === 0) {
+      return NextResponse.json({ error: "No tasks provided." }, { status: 400 });
+    }
+
+    let userRole = role;
+    if (userId && !userRole) {
+      const u = await prisma.user.findUnique({ where: { id: userId } });
+      if (u) userRole = u.role;
+    }
+
+    if (action === "approve") {
+      if (userRole !== "ADMIN") {
+        return NextResponse.json({ error: "Only Admins can approve tasks." }, { status: 403 });
+      }
+
+      const updateResult = await prisma.task.updateMany({
+        where: { id: { in: taskIds } },
+        data: {
+          adminStatus: "FINAL_COMPLETED",
+          employeeStatus: "COMPLETED",
+          isTimerRunning: false,
+          currentTimerStartedAt: null,
+        },
+      });
+
+      return NextResponse.json({
+        success: true,
+        count: updateResult.count,
+        message: `Successfully approved ${updateResult.count} tasks.`,
+      });
+    }
+
+    return NextResponse.json({ error: "Unsupported action." }, { status: 400 });
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+}
+
+// Bulk Actions: Batch Delete
+export async function DELETE(request: Request) {
+  try {
+    const body = await request.json();
+    const { taskIds, userId, role } = body;
+
+    if (!Array.isArray(taskIds) || taskIds.length === 0) {
+      return NextResponse.json({ error: "No tasks provided for deletion." }, { status: 400 });
+    }
+
+    let userRole = role;
+    if (userId && !userRole) {
+      const u = await prisma.user.findUnique({ where: { id: userId } });
+      if (u) userRole = u.role;
+    }
+
+    const isAdmin = userRole === "ADMIN";
+
+    // Where filter: Admin can delete any; Employee can only delete their own
+    const deleteWhere: any = {
+      id: { in: taskIds },
+    };
+    if (!isAdmin) {
+      deleteWhere.createdById = userId;
+    }
+
+    const deleteResult = await prisma.task.deleteMany({
+      where: deleteWhere,
+    });
+
+    return NextResponse.json({
+      success: true,
+      count: deleteResult.count,
+      message: `Successfully deleted ${deleteResult.count} tasks.`,
+    });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }

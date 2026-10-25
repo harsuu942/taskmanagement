@@ -8,17 +8,19 @@ export async function PUT(
   try {
     const leaveId = params.id;
     const body = await request.json();
-    const { status, reviewNotes, reviewerId } = body;
+    const {
+      status,
+      reviewNotes,
+      reviewerId,
+      startDate,
+      endDate,
+      leaveType,
+      reason,
+      daysCount,
+    } = body;
 
     if (!leaveId) {
       return NextResponse.json({ error: "Leave ID is required." }, { status: 400 });
-    }
-
-    if (!["APPROVED", "REJECTED"].includes(status)) {
-      return NextResponse.json(
-        { error: "Invalid status. Must be APPROVED or REJECTED." },
-        { status: 400 }
-      );
     }
 
     const existingLeave = await prisma.leaveRequest.findUnique({
@@ -30,13 +32,61 @@ export async function PUT(
       return NextResponse.json({ error: "Leave request not found." }, { status: 404 });
     }
 
+    const newStatus = status || existingLeave.status;
+    const newStartDate = startDate || existingLeave.startDate;
+    const newEndDate = endDate || existingLeave.endDate;
+    const newType = leaveType || existingLeave.leaveType;
+    const newReason = reason !== undefined ? reason : existingLeave.reason;
+
+    let calculatedDays = daysCount;
+    if (calculatedDays === undefined || calculatedDays === null) {
+      if (newType === "HALF_DAY") {
+        calculatedDays = 0.5;
+      } else {
+        const s = new Date(newStartDate).getTime();
+        const e = new Date(newEndDate).getTime();
+        calculatedDays = Math.max(1, Math.round((e - s) / (1000 * 60 * 60 * 24)) + 1);
+      }
+    }
+
+    // If previously approved and dates or status change, clean up old attendance on-leave records
+    if (existingLeave.status === "APPROVED" && (newStatus !== "APPROVED" || newStartDate !== existingLeave.startDate || newEndDate !== existingLeave.endDate)) {
+      try {
+        const oldStart = new Date(existingLeave.startDate);
+        const oldEnd = new Date(existingLeave.endDate);
+        const oldCur = new Date(oldStart);
+        while (oldCur <= oldEnd) {
+          const dateStr = oldCur.toISOString().slice(0, 10);
+          await prisma.attendance.updateMany({
+            where: {
+              userId: existingLeave.userId,
+              date: dateStr,
+              status: "ON_LEAVE",
+            },
+            data: {
+              status: "PRESENT",
+              notes: "Leave adjusted by Admin",
+            },
+          });
+          oldCur.setDate(oldCur.getDate() + 1);
+        }
+      } catch (cleanErr) {
+        console.error("Error cleaning up previous leave attendance:", cleanErr);
+      }
+    }
+
     const updatedLeave = await prisma.leaveRequest.update({
       where: { id: leaveId },
       data: {
-        status,
-        reviewNotes: reviewNotes?.trim() || null,
-        reviewedById: reviewerId || null,
-        reviewedAt: new Date(),
+        status: newStatus,
+        startDate: newStartDate,
+        endDate: newEndDate,
+        leaveType: newType,
+        reason: newReason,
+        daysCount: calculatedDays,
+        reviewNotes: reviewNotes !== undefined ? (reviewNotes?.trim() || null) : existingLeave.reviewNotes,
+        reviewedById: reviewerId || existingLeave.reviewedById,
+        reviewedAt: newStatus !== existingLeave.status ? new Date() : existingLeave.reviewedAt,
       },
       include: {
         user: {

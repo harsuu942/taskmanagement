@@ -19,6 +19,11 @@ import {
   Edit3,
   Save,
   X,
+  FileText,
+  Trash2,
+  Plus,
+  Upload,
+  Download,
 } from "lucide-react";
 import { formatDuration } from "@/lib/formatters";
 import { exportToExcel } from "@/lib/excelExport";
@@ -60,6 +65,163 @@ export default function AttendanceView({ currentUser, onRefresh }: AttendanceVie
   const [editNotes, setEditNotes] = useState("");
   const [editSaving, setEditSaving] = useState(false);
   const [editError, setEditError] = useState("");
+
+  // Holiday Management Modal state
+  const [isHolidayModalOpen, setIsHolidayModalOpen] = useState(false);
+  const [holidaysList, setHolidaysList] = useState<any[]>([]);
+  const [holidayTab, setHolidayTab] = useState<"list" | "add" | "import">("list");
+  const [newHolidayDate, setNewHolidayDate] = useState("");
+  const [newHolidayName, setNewHolidayName] = useState("");
+  const [newHolidayDesc, setNewHolidayDesc] = useState("");
+  const [holidaySaving, setHolidaySaving] = useState(false);
+  const [holidayError, setHolidayError] = useState("");
+  const [importText, setImportText] = useState("");
+  const [parsedImportRows, setParsedImportRows] = useState<Array<{ date: string; name: string; description?: string }>>([]);
+
+  const fetchHolidays = async () => {
+    try {
+      const res = await fetch("/api/holidays");
+      const data = await res.json();
+      if (res.ok) {
+        setHolidaysList(data.holidays || []);
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleAddHoliday = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newHolidayDate || !newHolidayName.trim()) {
+      setHolidayError("Please provide both Date and Holiday Name.");
+      return;
+    }
+    setHolidaySaving(true);
+    setHolidayError("");
+    try {
+      const res = await fetch("/api/holidays", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          date: newHolidayDate,
+          name: newHolidayName.trim(),
+          description: newHolidayDesc.trim() || null,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to add holiday");
+      setNewHolidayDate("");
+      setNewHolidayName("");
+      setNewHolidayDesc("");
+      setHolidayTab("list");
+      await fetchHolidays();
+      await fetchAttendance();
+    } catch (err: any) {
+      setHolidayError(err.message || "Failed to add holiday");
+    } finally {
+      setHolidaySaving(false);
+    }
+  };
+
+  const handleDeleteHoliday = async (id: string, name: string) => {
+    if (!confirm(`Are you sure you want to delete the holiday "${name}"?`)) return;
+    try {
+      const res = await fetch(`/api/holidays?id=${id}`, { method: "DELETE" });
+      const data = await res.json();
+      if (!res.ok) alert(data.error || "Failed to delete holiday");
+      await fetchHolidays();
+      await fetchAttendance();
+    } catch (err: any) {
+      alert(err.message || "Error deleting holiday");
+    }
+  };
+
+  const handleDownloadSampleHolidays = () => {
+    exportToExcel(
+      "NACS_Holidays_Sample_Template",
+      [
+        { header: "Date", key: "date" },
+        { header: "Holiday Name", key: "name" },
+        { header: "Description", key: "description" },
+      ],
+      [
+        { date: "2026-01-26", name: "Republic Day", description: "National Holiday" },
+        { date: "2026-08-15", name: "Independence Day", description: "National Holiday" },
+        { date: "2026-10-02", name: "Gandhi Jayanti", description: "National Holiday" },
+        { date: "2026-11-08", name: "Diwali", description: "Festival of Lights" },
+      ]
+    );
+  };
+
+  const parseHolidayCsvText = (text: string) => {
+    setImportText(text);
+    const lines = text.split(/\r?\n/).map((l) => l.trim()).filter((l) => l.length > 0);
+    const rows: Array<{ date: string; name: string; description?: string }> = [];
+
+    for (const line of lines) {
+      if (line.toLowerCase().includes("date") && (line.toLowerCase().includes("holiday") || line.toLowerCase().includes("name"))) {
+        continue;
+      }
+      let parts = line.split(",").map((s) => s.replace(/^["']|["']$/g, "").trim());
+      if (parts.length < 2) {
+        parts = line.split("\t").map((s) => s.trim());
+      }
+      if (parts.length >= 2) {
+        const rawDate = parts[0];
+        const rawName = parts[1];
+        const rawDesc = parts[2] || "";
+
+        const dateMatch = rawDate.match(/\b(\d{4}[-/.]\d{1,2}[-/.]\d{1,2})\b/);
+        if (dateMatch && rawName) {
+          const isoDate = dateMatch[1].replace(/[/.]/g, "-");
+          rows.push({
+            date: isoDate,
+            name: rawName,
+            description: rawDesc || undefined,
+          });
+        }
+      } else {
+        const match = line.match(/^(\d{4}[-/.]\d{1,2}[-/.]\d{1,2})[\s,]+(.+)$/);
+        if (match) {
+          rows.push({
+            date: match[1].replace(/[/.]/g, "-"),
+            name: match[2].trim(),
+          });
+        }
+      }
+    }
+    setParsedImportRows(rows);
+  };
+
+  const handleBulkImportHolidays = async () => {
+    if (parsedImportRows.length === 0) {
+      setHolidayError("No valid holiday records parsed to import.");
+      return;
+    }
+    setHolidaySaving(true);
+    setHolidayError("");
+    try {
+      const res = await fetch("/api/holidays", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          holidays: parsedImportRows,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to import holidays");
+      alert(data.message || `Successfully imported ${data.count} holidays.`);
+      setImportText("");
+      setParsedImportRows([]);
+      setHolidayTab("list");
+      await fetchHolidays();
+      await fetchAttendance();
+    } catch (err: any) {
+      setHolidayError(err.message || "Failed to import holidays");
+    } finally {
+      setHolidaySaving(false);
+    }
+  };
 
   const handleOpenEditModal = (item: any) => {
     setEditingItem(item);
@@ -401,9 +563,17 @@ export default function AttendanceView({ currentUser, onRefresh }: AttendanceVie
                 <span className="text-blue-400 font-bold bg-blue-950/60 px-2 py-0.5 rounded border border-blue-500/40">
                   ✓ Checked Out
                 </span>
+              ) : myRecord?.status === "PUBLIC_HOLIDAY" ? (
+                <span className="text-amber-300 font-bold bg-amber-950/60 px-2 py-0.5 rounded border border-amber-500/40">
+                  🎉 Public Holiday{myRecord.holidayName ? `: ${myRecord.holidayName}` : ""}
+                </span>
+              ) : myRecord?.status === "ON_LEAVE" ? (
+                <span className="text-purple-300 font-bold bg-purple-950/60 px-2 py-0.5 rounded border border-purple-500/40">
+                  🌴 Approved Leave
+                </span>
               ) : (
                 <span className="text-rose-400 font-bold bg-rose-950/60 px-2 py-0.5 rounded border border-rose-500/40">
-                  ● On Leave / Not Checked In
+                  ● Not Checked In
                 </span>
               )}
             </div>
@@ -500,9 +670,22 @@ export default function AttendanceView({ currentUser, onRefresh }: AttendanceVie
             </div>
 
             <div className="flex items-center space-x-2">
+              {isAdmin && (
+                <button
+                  onClick={() => {
+                    setIsHolidayModalOpen(true);
+                    fetchHolidays();
+                  }}
+                  className="flex items-center space-x-1.5 px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-xs font-bold transition shadow-xs cursor-pointer"
+                  title="Manage Public Holidays & Calendar (Excel/Manual)"
+                >
+                  <Calendar className="w-3.5 h-3.5" />
+                  <span>Holiday Calendar</span>
+                </button>
+              )}
               <button
                 onClick={handleExportExcel}
-                className="flex items-center space-x-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition shadow-xs"
+                className="flex items-center space-x-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition shadow-xs cursor-pointer"
                 title="Export current attendance roster to Excel"
               >
                 <FileSpreadsheet className="w-3.5 h-3.5" />
@@ -510,7 +693,7 @@ export default function AttendanceView({ currentUser, onRefresh }: AttendanceVie
               </button>
               <button
                 onClick={fetchAttendance}
-                className="p-1.5 text-slate-500 hover:text-slate-800 hover:bg-slate-200 rounded-lg transition"
+                className="p-1.5 text-slate-500 hover:text-slate-800 hover:bg-slate-200 rounded-lg transition cursor-pointer"
                 title="Refresh Roster"
               >
                 <RefreshCw className="w-4 h-4" />
@@ -719,6 +902,10 @@ export default function AttendanceView({ currentUser, onRefresh }: AttendanceVie
                         <span className="bg-blue-100 text-blue-800 font-bold px-2.5 py-1 rounded-full text-[10px] border border-blue-200">
                           ✓ Checked Out
                         </span>
+                      ) : item.status === "PUBLIC_HOLIDAY" ? (
+                        <span className="bg-amber-50 text-amber-900 font-bold px-2.5 py-1 rounded-full text-[10px] border border-amber-300">
+                          🎉 Public Holiday{item.holidayName ? `: ${item.holidayName}` : ""}
+                        </span>
                       ) : item.status === "ON_LEAVE" ? (
                         <span className="bg-purple-100 text-purple-800 font-bold px-2.5 py-1 rounded-full text-[10px] border border-purple-200">
                           🌴 Approved Leave
@@ -889,6 +1076,329 @@ export default function AttendanceView({ currentUser, onRefresh }: AttendanceVie
               >
                 <Save className="w-3.5 h-3.5" />
                 <span>{editSaving ? "Saving..." : "Save Changes"}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Admin Public Holiday Calendar Modal */}
+      {isHolidayModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4 overflow-y-auto">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full border border-slate-200 overflow-hidden my-8 animate-in fade-in zoom-in-95 duration-200">
+            {/* Header */}
+            <div className="bg-gradient-to-r from-purple-700 to-indigo-800 text-white p-5 flex items-center justify-between">
+              <div className="flex items-center space-x-2.5">
+                <Calendar className="w-5 h-5 text-purple-200" />
+                <div>
+                  <h3 className="font-extrabold text-base">🎉 Public Holiday Calendar</h3>
+                  <p className="text-xs text-purple-100">
+                    Official holidays show as &ldquo;Public Holiday&rdquo; instead of unexcused absent.
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsHolidayModalOpen(false)}
+                className="text-white/80 hover:text-white p-1 rounded-lg hover:bg-white/10 transition cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Sub-tabs */}
+            <div className="flex border-b border-slate-200 bg-slate-50 px-5 pt-3 space-x-4 text-xs font-bold">
+              <button
+                onClick={() => setHolidayTab("list")}
+                className={`pb-2.5 px-1 border-b-2 transition flex items-center space-x-1.5 cursor-pointer ${
+                  holidayTab === "list"
+                    ? "border-purple-600 text-purple-700"
+                    : "border-transparent text-slate-500 hover:text-slate-800"
+                }`}
+              >
+                <span>Holidays List</span>
+                <span className="bg-purple-100 text-purple-800 px-1.5 py-0.2 rounded-full text-[10px]">
+                  {holidaysList.length}
+                </span>
+              </button>
+              <button
+                onClick={() => setHolidayTab("add")}
+                className={`pb-2.5 px-1 border-b-2 transition flex items-center space-x-1 cursor-pointer ${
+                  holidayTab === "add"
+                    ? "border-purple-600 text-purple-700"
+                    : "border-transparent text-slate-500 hover:text-slate-800"
+                }`}
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Add Single Holiday</span>
+              </button>
+              <button
+                onClick={() => setHolidayTab("import")}
+                className={`pb-2.5 px-1 border-b-2 transition flex items-center space-x-1 cursor-pointer ${
+                  holidayTab === "import"
+                    ? "border-purple-600 text-purple-700"
+                    : "border-transparent text-slate-500 hover:text-slate-800"
+                }`}
+              >
+                <Upload className="w-3.5 h-3.5" />
+                <span>Import from Excel / CSV</span>
+              </button>
+            </div>
+
+            {/* Error Message */}
+            {holidayError && (
+              <div className="mx-5 mt-4 p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 text-xs flex items-center space-x-2">
+                <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
+                <span>{holidayError}</span>
+              </div>
+            )}
+
+            {/* Tab Body */}
+            <div className="p-5 max-h-[60vh] overflow-y-auto">
+              {holidayTab === "list" && (
+                <div>
+                  {holidaysList.length === 0 ? (
+                    <div className="text-center py-12 text-slate-400">
+                      <Calendar className="w-10 h-10 mx-auto text-slate-300 mb-2" />
+                      <p className="text-sm font-semibold text-slate-600">No public holidays added yet.</p>
+                      <p className="text-xs text-slate-400 mt-1 mb-4">
+                        Add individual holidays or import your annual calendar from Excel.
+                      </p>
+                      <div className="flex items-center justify-center space-x-3">
+                        <button
+                          onClick={() => setHolidayTab("add")}
+                          className="px-3.5 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-xs font-bold transition shadow-xs cursor-pointer"
+                        >
+                          + Add Holiday
+                        </button>
+                        <button
+                          onClick={() => setHolidayTab("import")}
+                          className="px-3.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 rounded-lg text-xs font-bold transition cursor-pointer"
+                        >
+                          Import Excel/CSV
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <table className="w-full text-left text-xs border border-slate-200 rounded-lg overflow-hidden">
+                      <thead className="bg-slate-100 text-slate-700 font-bold uppercase text-[10px] tracking-wider border-b border-slate-200">
+                        <tr>
+                          <th className="py-2.5 px-3">Date</th>
+                          <th className="py-2.5 px-3">Holiday Name</th>
+                          <th className="py-2.5 px-3">Notes</th>
+                          <th className="py-2.5 px-3 text-right">Action</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {holidaysList.map((h) => (
+                          <tr key={h.id} className="hover:bg-purple-50/40 transition">
+                            <td className="py-2.5 px-3 font-mono font-semibold text-purple-900 whitespace-nowrap">
+                              {h.date}
+                            </td>
+                            <td className="py-2.5 px-3 font-bold text-slate-800">
+                              {h.name}
+                            </td>
+                            <td className="py-2.5 px-3 text-slate-500">
+                              {h.description || "-"}
+                            </td>
+                            <td className="py-2.5 px-3 text-right">
+                              <button
+                                onClick={() => handleDeleteHoliday(h.id, h.name)}
+                                className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded transition cursor-pointer"
+                                title="Delete Holiday"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
+                </div>
+              )}
+
+              {holidayTab === "add" && (
+                <form onSubmit={handleAddHoliday} className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                      Holiday Date *
+                    </label>
+                    <input
+                      type="date"
+                      required
+                      value={newHolidayDate}
+                      onChange={(e) => setNewHolidayDate(e.target.value)}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs bg-slate-50 focus:bg-white outline-none focus:ring-2 focus:ring-purple-500 font-medium"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                      Holiday Name *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. Republic Day, Independence Day, Diwali"
+                      value={newHolidayName}
+                      onChange={(e) => setNewHolidayName(e.target.value)}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs bg-slate-50 focus:bg-white outline-none focus:ring-2 focus:ring-purple-500 font-medium"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                      Description / Category (Optional)
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. National Gazetted Holiday"
+                      value={newHolidayDesc}
+                      onChange={(e) => setNewHolidayDesc(e.target.value)}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs bg-slate-50 focus:bg-white outline-none focus:ring-2 focus:ring-purple-500 font-medium"
+                    />
+                  </div>
+
+                  <div className="pt-2 flex justify-end space-x-2">
+                    <button
+                      type="button"
+                      onClick={() => setHolidayTab("list")}
+                      className="px-4 py-2 text-xs font-bold text-slate-600 hover:text-slate-800 hover:bg-slate-100 rounded-xl transition cursor-pointer"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={holidaySaving}
+                      className="px-5 py-2 text-xs font-bold text-white bg-purple-600 hover:bg-purple-700 disabled:opacity-50 rounded-xl transition shadow-md shadow-purple-500/20 flex items-center space-x-1.5 cursor-pointer"
+                    >
+                      <Save className="w-3.5 h-3.5" />
+                      <span>{holidaySaving ? "Saving..." : "Save Holiday"}</span>
+                    </button>
+                  </div>
+                </form>
+              )}
+
+              {holidayTab === "import" && (
+                <div className="space-y-4">
+                  <div className="p-3 bg-purple-50 border border-purple-200 rounded-xl text-xs text-purple-900 flex items-start justify-between gap-3">
+                    <div className="space-y-1">
+                      <p className="font-bold">Excel / CSV Batch Calendar Import</p>
+                      <p className="text-purple-700 text-[11px]">
+                        Upload your holiday schedule file or copy-paste directly from Excel / Google Sheets.
+                        Columns expected: <strong>Date (YYYY-MM-DD), Holiday Name, Notes (optional)</strong>.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleDownloadSampleHolidays}
+                      className="shrink-0 flex items-center space-x-1 px-2.5 py-1.5 bg-white border border-purple-300 hover:bg-purple-100 text-purple-800 rounded-lg text-xs font-bold shadow-2xs transition cursor-pointer"
+                      title="Download sample Excel template"
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                      <span>Sample Template</span>
+                    </button>
+                  </div>
+
+                  {/* File Upload Selector */}
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                      Upload File (.csv / .tsv / .txt)
+                    </label>
+                    <input
+                      type="file"
+                      accept=".csv,.txt,.tsv"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          const reader = new FileReader();
+                          reader.onload = (evt) => {
+                            const content = evt.target?.result as string;
+                            if (content) parseHolidayCsvText(content);
+                          };
+                          reader.readAsText(file);
+                        }
+                      }}
+                      className="block w-full text-xs text-slate-500 file:mr-3 file:py-2 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-purple-50 file:text-purple-700 hover:file:bg-purple-100 cursor-pointer border border-slate-300 rounded-xl p-1 bg-slate-50"
+                    />
+                  </div>
+
+                  {/* Direct Paste Area */}
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                      Or Paste Text / Table Rows
+                    </label>
+                    <textarea
+                      rows={5}
+                      value={importText}
+                      onChange={(e) => parseHolidayCsvText(e.target.value)}
+                      placeholder={`2026-01-26, Republic Day, National Holiday\n2026-08-15, Independence Day\n2026-10-02, Gandhi Jayanti\n2026-11-08, Diwali, Festival`}
+                      className="w-full font-mono text-xs px-3 py-2 border border-slate-300 rounded-xl bg-slate-50 focus:bg-white outline-none focus:ring-2 focus:ring-purple-500"
+                    />
+                  </div>
+
+                  {/* Parsed Preview Table */}
+                  {parsedImportRows.length > 0 && (
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between text-xs font-bold text-emerald-700">
+                        <span>✓ Successfully parsed {parsedImportRows.length} holiday(s):</span>
+                      </div>
+                      <div className="max-h-40 overflow-y-auto border border-emerald-200 rounded-xl bg-emerald-50/40 p-2 text-xs">
+                        <table className="w-full text-left">
+                          <thead>
+                            <tr className="text-[10px] text-emerald-900 uppercase font-bold border-b border-emerald-200">
+                              <th className="py-1 px-2">Date</th>
+                              <th className="py-1 px-2">Name</th>
+                              <th className="py-1 px-2">Description</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-emerald-100 text-[11px]">
+                            {parsedImportRows.map((r, idx) => (
+                              <tr key={idx}>
+                                <td className="py-1 px-2 font-mono font-bold text-emerald-900">{r.date}</td>
+                                <td className="py-1 px-2 font-semibold text-slate-800">{r.name}</td>
+                                <td className="py-1 px-2 text-slate-500">{r.description || "-"}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+
+                      <div className="pt-2 flex justify-end space-x-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setImportText("");
+                            setParsedImportRows([]);
+                          }}
+                          className="px-4 py-2 text-xs font-bold text-slate-600 hover:text-slate-800 hover:bg-slate-100 rounded-xl transition cursor-pointer"
+                        >
+                          Clear
+                        </button>
+                        <button
+                          type="button"
+                          disabled={holidaySaving}
+                          onClick={handleBulkImportHolidays}
+                          className="px-5 py-2 text-xs font-bold text-white bg-purple-600 hover:bg-purple-700 disabled:opacity-50 rounded-xl transition shadow-md shadow-purple-500/20 flex items-center space-x-1.5 cursor-pointer"
+                        >
+                          <Upload className="w-3.5 h-3.5" />
+                          <span>{holidaySaving ? "Importing..." : `Import ${parsedImportRows.length} Holidays`}</span>
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="bg-slate-50 p-4 border-t border-slate-200 flex items-center justify-end">
+              <button
+                type="button"
+                onClick={() => setIsHolidayModalOpen(false)}
+                className="px-4 py-2 text-xs font-bold text-slate-700 hover:bg-slate-200 rounded-xl transition cursor-pointer"
+              >
+                Close
               </button>
             </div>
           </div>

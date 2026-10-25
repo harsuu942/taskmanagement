@@ -39,6 +39,7 @@ interface TaskListViewProps {
   onTimerAction: (taskId: string, action: "start" | "hold" | "resume" | "stop" | "complete") => Promise<void>;
   onAdminApprove: (taskId: string) => Promise<void>;
   onAdminRevision: (taskId: string) => Promise<void>;
+  onTasksUpdated?: () => void;
 }
 
 export default function TaskListView({
@@ -53,6 +54,7 @@ export default function TaskListView({
   onTimerAction,
   onAdminApprove,
   onAdminRevision,
+  onTasksUpdated,
 }: TaskListViewProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [filterAssignee, setFilterAssignee] = useState("ALL");
@@ -60,6 +62,10 @@ export default function TaskListView({
   const [filterPriority, setFilterPriority] = useState("ALL");
   const [filterRecurrence, setFilterRecurrence] = useState("ALL");
   const [filterStatus, setFilterStatus] = useState("ALL");
+
+  // Bulk Selection state
+  const [selectedTaskIds, setSelectedTaskIds] = useState<Set<string>>(new Set());
+  const [bulkLoading, setBulkLoading] = useState(false);
 
   const isAdmin = currentUser?.role === "ADMIN";
 
@@ -153,6 +159,86 @@ export default function TaskListView({
       }
       return true;
     });
+
+  const toggleSelectTask = (taskId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setSelectedTaskIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(taskId)) {
+        next.delete(taskId);
+      } else {
+        next.add(taskId);
+      }
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedTaskIds.size === filteredTasks.length && filteredTasks.length > 0) {
+      setSelectedTaskIds(new Set());
+    } else {
+      setSelectedTaskIds(new Set(filteredTasks.map((t) => t.id)));
+    }
+  };
+
+  const handleBulkApprove = async () => {
+    if (selectedTaskIds.size === 0) return;
+    if (!confirm(`Are you sure you want to approve ${selectedTaskIds.size} selected tasks as FINAL COMPLETED?`)) return;
+    setBulkLoading(true);
+    try {
+      const res = await fetch("/api/tasks", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          taskIds: Array.from(selectedTaskIds),
+          action: "approve",
+          userId: currentUser?.id,
+          role: currentUser?.role,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        alert(data.error || "Failed to approve tasks");
+      }
+      setSelectedTaskIds(new Set());
+      if (onTasksUpdated) {
+        onTasksUpdated();
+      }
+    } catch (err: any) {
+      alert(err.message || "Error approving tasks");
+    } finally {
+      setBulkLoading(false);
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedTaskIds.size === 0) return;
+    if (!confirm(`Are you sure you want to delete ${selectedTaskIds.size} selected tasks? This cannot be undone.`)) return;
+    setBulkLoading(true);
+    try {
+      const res = await fetch("/api/tasks", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          taskIds: Array.from(selectedTaskIds),
+          userId: currentUser?.id,
+          role: currentUser?.role,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        alert(data.error || "Failed to delete tasks");
+      }
+      setSelectedTaskIds(new Set());
+      if (onTasksUpdated) {
+        onTasksUpdated();
+      }
+    } catch (err: any) {
+      alert(err.message || "Error deleting tasks");
+    } finally {
+      setBulkLoading(false);
+    }
+  };
 
   // Dynamic row background & border based on employee status
   const getRowStyle = (task: Task) => {
@@ -350,11 +436,62 @@ export default function TaskListView({
         </span>
       </div>
 
+      {/* Sticky Bulk Actions Bar */}
+      {selectedTaskIds.size > 0 && (
+        <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-indigo-950 text-white p-3 px-5 flex items-center justify-between flex-wrap gap-3 border-y border-slate-700 shadow-md">
+          <div className="flex items-center space-x-3">
+            <span className="bg-blue-600 text-white font-bold text-xs px-2.5 py-1 rounded-md shadow-xs">
+              {selectedTaskIds.size} Selected
+            </span>
+            <span className="text-xs text-slate-300 font-medium">
+              Bulk actions for selected tasks:
+            </span>
+          </div>
+          <div className="flex items-center space-x-2">
+            {isAdmin && (
+              <button
+                disabled={bulkLoading}
+                onClick={handleBulkApprove}
+                className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white px-3.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center space-x-1.5 cursor-pointer shadow-xs"
+                title="Mark all selected tasks as FINAL COMPLETED"
+              >
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                <span>Approve Selected</span>
+              </button>
+            )}
+            <button
+              disabled={bulkLoading}
+              onClick={handleBulkDelete}
+              className="bg-rose-600 hover:bg-rose-700 disabled:opacity-50 text-white px-3.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center space-x-1.5 cursor-pointer shadow-xs"
+              title="Delete all selected tasks"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              <span>Delete Selected</span>
+            </button>
+            <button
+              onClick={() => setSelectedTaskIds(new Set())}
+              className="bg-slate-700/80 hover:bg-slate-700 text-slate-300 hover:text-white px-3 py-1.5 rounded-lg text-xs font-medium transition cursor-pointer"
+            >
+              Clear Selection
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Task Table */}
       <div className="overflow-x-auto w-full">
         <table className="w-full text-left border-collapse text-xs">
           <thead>
             <tr className="bg-slate-100 text-slate-700 font-bold border-b border-slate-200 uppercase tracking-wider text-[11px]">
+              <th className="py-3 px-3 w-10 text-center">
+                <input
+                  type="checkbox"
+                  checked={filteredTasks.length > 0 && selectedTaskIds.size === filteredTasks.length}
+                  onChange={toggleSelectAll}
+                  className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 border-slate-300 cursor-pointer accent-blue-600"
+                  title="Select / Deselect all visible tasks"
+                />
+              </th>
               <th className="py-3 px-4">Task Name</th>
               <th className="py-3 px-3">Client</th>
               <th className="py-3 px-3">Assignee</th>
@@ -370,7 +507,7 @@ export default function TaskListView({
           <tbody className="divide-y divide-slate-200">
             {filteredTasks.length === 0 ? (
               <tr>
-                <td colSpan={10} className="py-14 text-center text-slate-400">
+                <td colSpan={11} className="py-14 text-center text-slate-400">
                   <div className="text-sm font-semibold text-slate-600">No tasks found</div>
                   <p className="text-xs text-slate-400 mt-1">
                     {!isAdmin ? "You currently have no tasks matching this filter." : "Try resetting search filters or create a new task."}
@@ -392,6 +529,19 @@ export default function TaskListView({
                   onClick={() => onSelectTask(task)}
                   className={`transition-all cursor-pointer group ${getRowStyle(task)}`}
                 >
+                  {/* Selection Checkbox */}
+                  <td
+                    className="py-3.5 px-3 text-center w-10"
+                    onClick={(e) => toggleSelectTask(task.id, e)}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selectedTaskIds.has(task.id)}
+                      onChange={() => {}}
+                      className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 border-slate-300 cursor-pointer accent-blue-600"
+                    />
+                  </td>
+
                   {/* Task Name */}
                   <td className="py-3.5 px-4 font-bold max-w-sm">
                     <div className="flex items-center space-x-2">

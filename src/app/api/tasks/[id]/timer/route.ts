@@ -148,7 +148,7 @@ export async function POST(
     }
 
     if (action === "manual_log") {
-      const { durationMinutes, durationSeconds, logDate, note } = body;
+      const { durationMinutes, durationSeconds, logDate, note, targetUserId } = body;
       const secs = durationSeconds
         ? parseInt(durationSeconds, 10)
         : durationMinutes
@@ -163,11 +163,12 @@ export async function POST(
 
       const logTimestamp = logDate ? new Date(logDate) : new Date();
       const endTimestamp = new Date(logTimestamp.getTime() + secs * 1000);
+      const effectiveUser = targetUserId || userId || task.assignedToId || task.createdById;
 
       await prisma.timeLog.create({
         data: {
           taskId: task.id,
-          userId: userId || task.assignedToId || task.createdById,
+          userId: effectiveUser,
           startTime: logTimestamp,
           endTime: endTimestamp,
           durationSeconds: secs,
@@ -199,8 +200,51 @@ export async function POST(
       });
     }
 
+    if (action === "admin_set_time" || action === "adjust_time") {
+      const { totalDurationSeconds, note, targetUserId } = body;
+      const newSeconds = Math.max(0, parseInt(totalDurationSeconds, 10) || 0);
+
+      const diff = newSeconds - (task.totalDurationSeconds || 0);
+      const effectiveUser = targetUserId || userId || task.assignedToId || task.createdById;
+
+      if (diff !== 0) {
+        await prisma.timeLog.create({
+          data: {
+            taskId: task.id,
+            userId: effectiveUser,
+            startTime: now,
+            endTime: now,
+            durationSeconds: Math.abs(diff),
+            isRunning: false,
+            note: note || `Admin adjusted total duration to ${Math.round(newSeconds / 60)} minutes (${diff > 0 ? "+" : ""}${Math.round(diff / 60)}m)`,
+          },
+        });
+      }
+
+      const updated = await prisma.task.update({
+        where: { id: task.id },
+        data: {
+          totalDurationSeconds: newSeconds,
+          isTimerRunning: false,
+          currentTimerStartedAt: null,
+        },
+        include: {
+          assignedTo: true,
+          taskClients: { include: { client: true } },
+          assignees: { include: { user: true } },
+          timeLogs: { orderBy: { createdAt: "desc" } },
+        },
+      });
+
+      return NextResponse.json({
+        success: true,
+        task: updated,
+        message: `Total duration adjusted to ${Math.floor(newSeconds / 3600)}h ${Math.floor((newSeconds % 3600) / 60)}m.`,
+      });
+    }
+
     return NextResponse.json(
-      { error: "Invalid action. Use start, hold, resume, complete, or manual_log." },
+      { error: "Invalid action. Use start, hold, resume, complete, manual_log, or admin_set_time." },
       { status: 400 }
     );
   } catch (error: any) {

@@ -27,6 +27,7 @@ model User {
   leaveRequests  LeaveRequest[] @relation("UserLeaves")
   reviewedLeaves LeaveRequest[] @relation("ReviewedLeaves")
   taskAssignments TaskAssignee[]
+  taskProofs    TaskProof[]
 }
 
 model Task {
@@ -67,6 +68,7 @@ model Task {
   createdBy            User       @relation("CreatedTasks", fields: [createdById], references: [id], onDelete: Cascade)
 
   timeLogs             TimeLog[]
+  proofs               TaskProof[]
   createdAt            DateTime   @default(now())
   updatedAt            DateTime   @updatedAt
 }
@@ -188,4 +190,23 @@ model TaskClient {
   @@unique([taskId, clientId])
 }
 
+model Holiday {
+  id          String   @id @default(cuid())
+  date        String   @unique // YYYY-MM-DD
+  name        String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
 
+model TaskProof {
+  id        String   @id @default(cuid())
+  taskId    String
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  imageUrl  String
+  caption   String?
+  source    String   @default("WEB_CAPTURE") // WEB_CAPTURE | MANUAL_UPLOAD | DESKTOP_AGENT
+  createdAt DateTime @default(now())
+}

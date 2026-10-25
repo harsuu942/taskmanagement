@@ -20,12 +20,20 @@ export async function GET(request: Request) {
       orderBy: { name: "asc" },
     });
 
+    // Fetch holidays for the selected date or date range
+    const holidays = await prisma.holiday.findMany({
+      where: isRange
+        ? { date: { gte: startDate, lte: endDate } }
+        : { date: startDate },
+    });
+    const holidayMap = new Map(holidays.map((h) => [h.date, h]));
+
     let roster: any[] = [];
 
     const now = new Date();
 
     if (!isRange) {
-      // Single-day view: show all employees (or filtered employee) including absent/leave
+      // Single-day view: show all employees (or filtered employee) including absent/leave or public holiday
       const attendances = await prisma.attendance.findMany({
         where: { date: startDate },
         include: { user: true },
@@ -36,6 +44,8 @@ export async function GET(request: Request) {
       const targetEmployees = employeeId && employeeId !== "ALL"
         ? allEmployees.filter((e) => e.id === employeeId)
         : allEmployees;
+
+      const singleDayHoliday = holidayMap.get(startDate);
 
       roster = targetEmployees.map((emp) => {
         const record = attendanceMap.get(emp.id);
@@ -49,6 +59,7 @@ export async function GET(request: Request) {
             employee: emp,
             record,
             status: record.status,
+            holidayName: singleDayHoliday ? singleDayHoliday.name : null,
             checkInTime: record.checkInTime,
             checkOutTime: record.checkOutTime,
             workDurationSeconds: liveActiveWork,
@@ -63,7 +74,8 @@ export async function GET(request: Request) {
             date: startDate,
             employee: emp,
             record: null,
-            status: "ABSENT_LEAVE",
+            status: singleDayHoliday ? "PUBLIC_HOLIDAY" : "ABSENT_LEAVE",
+            holidayName: singleDayHoliday ? singleDayHoliday.name : null,
             checkInTime: null,
             checkOutTime: null,
             workDurationSeconds: 0,
@@ -104,6 +116,7 @@ export async function GET(request: Request) {
           employee: rec.user,
           record: rec,
           status: rec.status,
+          holidayName: holidayMap.get(rec.date)?.name || null,
           checkInTime: rec.checkInTime,
           checkOutTime: rec.checkOutTime,
           workDurationSeconds: liveActiveWork,
@@ -163,6 +176,8 @@ export async function GET(request: Request) {
         present: roster.filter((r) => r.status === "PRESENT").length,
         checkedOut: roster.filter((r) => r.status === "CHECKED_OUT").length,
         absentOrLeave: roster.filter((r) => r.status === "ABSENT_LEAVE").length,
+        onLeave: roster.filter((r) => r.status === "ON_LEAVE").length,
+        publicHoliday: roster.filter((r) => r.status === "PUBLIC_HOLIDAY").length,
         totalWorkDurationSeconds: totalWorkDuration,
       },
     });

@@ -26,8 +26,18 @@ interface ReportsViewProps {
 
 export default function ReportsView({ currentUser, allUsers }: ReportsViewProps) {
   const todayStr = new Date().toISOString().slice(0, 10);
+  const [dateMode, setDateMode] = useState<"single" | "range">("single");
   const [datePreset, setDatePreset] = useState<string>("today");
   const [date, setDate] = useState(todayStr);
+
+  // Custom date range state (defaults to start of month to today)
+  const [startDate, setStartDate] = useState(() => {
+    const d = new Date();
+    d.setDate(1);
+    return d.toISOString().slice(0, 10);
+  });
+  const [endDate, setEndDate] = useState(todayStr);
+
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>("ALL");
   const [activityFilter, setActivityFilter] = useState<string>("ALL");
   const [searchQuery, setSearchQuery] = useState("");
@@ -71,10 +81,33 @@ export default function ReportsView({ currentUser, allUsers }: ReportsViewProps)
     }
   };
 
+  const applyRangePreset = (preset: string) => {
+    setDatePreset(preset);
+    const now = new Date();
+    const today = now.toISOString().slice(0, 10);
+    setEndDate(today);
+
+    if (preset === "thisWeek") {
+      const day = now.getDay();
+      const diff = now.getDate() - day + (day === 0 ? -6 : 1);
+      const monday = new Date(now.setDate(diff));
+      setStartDate(monday.toISOString().slice(0, 10));
+    } else if (preset === "thisMonth") {
+      const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+      setStartDate(firstDay.toISOString().slice(0, 10));
+    } else if (preset === "last30Days") {
+      const past = new Date();
+      past.setDate(past.getDate() - 30);
+      setStartDate(past.toISOString().slice(0, 10));
+    }
+  };
+
   const fetchReports = async () => {
     setLoading(true);
     try {
-      const url = `/api/reports/eod?date=${date}${selectedEmployeeId !== "ALL" ? `&employeeId=${selectedEmployeeId}` : ""}`;
+      const url = dateMode === "range"
+        ? `/api/reports/eod?startDate=${startDate}&endDate=${endDate}${selectedEmployeeId !== "ALL" ? `&employeeId=${selectedEmployeeId}` : ""}`
+        : `/api/reports/eod?date=${date}${selectedEmployeeId !== "ALL" ? `&employeeId=${selectedEmployeeId}` : ""}`;
       const res = await fetch(url);
       const data = await res.json();
       if (res.ok) {
@@ -91,7 +124,7 @@ export default function ReportsView({ currentUser, allUsers }: ReportsViewProps)
 
   useEffect(() => {
     fetchReports();
-  }, [date, selectedEmployeeId]);
+  }, [dateMode, date, startDate, endDate, selectedEmployeeId]);
 
   const handleSendToGmail = async (employeeId?: string) => {
     setSending(true);
@@ -102,7 +135,7 @@ export default function ReportsView({ currentUser, allUsers }: ReportsViewProps)
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           employeeId: employeeId || selectedEmployeeId,
-          date,
+          date: dateMode === "range" ? startDate : date,
         }),
       });
       const data = await res.json();
@@ -117,8 +150,11 @@ export default function ReportsView({ currentUser, allUsers }: ReportsViewProps)
 
   const handleExportExcel = () => {
     if (filteredReports.length === 0) return;
+    const filename = dateMode === "range"
+      ? `NACS_Report_${startDate}_to_${endDate}`
+      : `NACS_EOD_Report_${date}`;
     exportToExcel(
-      `EOD_Report_${date}`,
+      filename,
       [
         { header: "Employee Name", formatter: (r: any) => r.employee?.name || "" },
         { header: "Employee Email", formatter: (r: any) => r.employee?.email || "" },
@@ -265,41 +301,132 @@ export default function ReportsView({ currentUser, allUsers }: ReportsViewProps)
           )}
         </div>
 
-        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-3 pt-2 border-t border-slate-100">
-          {/* Date Presets */}
-          <div className="flex items-center gap-1.5 flex-wrap">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mr-1">
-              Date:
-            </span>
-            {[
-              { id: "today", label: "Today" },
-              { id: "yesterday", label: "Yesterday" },
-              { id: "2daysAgo", label: "2 Days Ago" },
-              { id: "custom", label: "Custom Date" },
-            ].map((p) => (
+        <div className="flex flex-col gap-3 pt-2 border-t border-slate-100">
+          {/* Mode Switcher: Single Day vs Custom Date Range */}
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <div className="flex items-center space-x-2 bg-slate-100 p-1 rounded-xl">
               <button
-                key={p.id}
-                onClick={() => applyDatePreset(p.id)}
-                className={`px-2.5 py-1 text-xs font-bold rounded-lg transition ${
-                  datePreset === p.id
-                    ? "bg-blue-600 text-white shadow-xs"
-                    : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-300"
+                type="button"
+                onClick={() => {
+                  setDateMode("single");
+                  setDatePreset("today");
+                  setDate(todayStr);
+                }}
+                className={`px-3 py-1 text-xs font-bold rounded-lg transition ${
+                  dateMode === "single"
+                    ? "bg-white text-blue-700 shadow-xs"
+                    : "text-slate-600 hover:text-slate-900"
                 }`}
               >
-                {p.label}
+                📅 Single Day Report
               </button>
-            ))}
+              <button
+                type="button"
+                onClick={() => {
+                  setDateMode("range");
+                  setDatePreset("thisMonth");
+                  applyRangePreset("thisMonth");
+                }}
+                className={`px-3 py-1 text-xs font-bold rounded-lg transition ${
+                  dateMode === "range"
+                    ? "bg-white text-blue-700 shadow-xs"
+                    : "text-slate-600 hover:text-slate-900"
+                }`}
+              >
+                🗓️ Custom Date Range (Multi-Day Extract)
+              </button>
+            </div>
 
-            <input
-              type="date"
-              value={date}
-              onChange={(e) => {
-                setDatePreset("custom");
-                setDate(e.target.value);
-              }}
-              className="px-2.5 py-1 text-xs bg-slate-50 border border-slate-300 rounded-lg outline-none font-medium ml-1"
-            />
+            {dateMode === "range" && (
+              <span className="text-[11px] text-blue-700 bg-blue-50 border border-blue-200 px-2.5 py-0.5 rounded-full font-semibold">
+                Multi-Day Excel Export Active: {startDate} ➔ {endDate}
+              </span>
+            )}
           </div>
+
+          <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-3">
+            {/* Date Pickers based on Mode */}
+            {dateMode === "single" ? (
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mr-1">
+                  Day:
+                </span>
+                {[
+                  { id: "today", label: "Today" },
+                  { id: "yesterday", label: "Yesterday" },
+                  { id: "2daysAgo", label: "2 Days Ago" },
+                  { id: "custom", label: "Custom Date" },
+                ].map((p) => (
+                  <button
+                    key={p.id}
+                    onClick={() => applyDatePreset(p.id)}
+                    className={`px-2.5 py-1 text-xs font-bold rounded-lg transition ${
+                      datePreset === p.id
+                        ? "bg-blue-600 text-white shadow-xs"
+                        : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-300"
+                    }`}
+                  >
+                    {p.label}
+                  </button>
+                ))}
+
+                <input
+                  type="date"
+                  value={date}
+                  onChange={(e) => {
+                    setDatePreset("custom");
+                    setDate(e.target.value);
+                  }}
+                  className="px-2.5 py-1 text-xs bg-slate-50 border border-slate-300 rounded-lg outline-none font-medium ml-1"
+                />
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mr-1">
+                  Range:
+                </span>
+                {[
+                  { id: "thisWeek", label: "This Week" },
+                  { id: "thisMonth", label: "This Month" },
+                  { id: "last30Days", label: "Last 30 Days" },
+                ].map((p) => (
+                  <button
+                    key={p.id}
+                    onClick={() => applyRangePreset(p.id)}
+                    className={`px-2.5 py-1 text-xs font-bold rounded-lg transition ${
+                      datePreset === p.id
+                        ? "bg-blue-600 text-white shadow-xs"
+                        : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-300"
+                    }`}
+                  >
+                    {p.label}
+                  </button>
+                ))}
+
+                <div className="flex items-center space-x-1.5 ml-2">
+                  <span className="text-[11px] font-bold text-slate-500">From:</span>
+                  <input
+                    type="date"
+                    value={startDate}
+                    onChange={(e) => {
+                      setDatePreset("custom");
+                      setStartDate(e.target.value);
+                    }}
+                    className="px-2 py-1 text-xs bg-slate-50 border border-slate-300 rounded-lg outline-none font-medium"
+                  />
+                  <span className="text-[11px] font-bold text-slate-500">To:</span>
+                  <input
+                    type="date"
+                    value={endDate}
+                    onChange={(e) => {
+                      setDatePreset("custom");
+                      setEndDate(e.target.value);
+                    }}
+                    className="px-2 py-1 text-xs bg-slate-50 border border-slate-300 rounded-lg outline-none font-medium"
+                  />
+                </div>
+              </div>
+            )}
 
           {/* Employee & Activity Dropdowns & Search */}
           <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap w-full lg:w-auto">
@@ -350,6 +477,7 @@ export default function ReportsView({ currentUser, allUsers }: ReportsViewProps)
           </div>
         </div>
       </div>
+    </div>
 
       {/* Result Alert */}
       {sendResult && (

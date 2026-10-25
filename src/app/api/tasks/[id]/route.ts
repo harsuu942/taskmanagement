@@ -22,6 +22,10 @@ export async function GET(
           include: { user: true },
           orderBy: { createdAt: "desc" },
         },
+        proofs: {
+          include: { user: true },
+          orderBy: { createdAt: "desc" },
+        },
       },
     });
 
