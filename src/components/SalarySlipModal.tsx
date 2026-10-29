@@ -118,7 +118,36 @@ export default function SalarySlipModal({
   const [lwpOverride, setLwpOverride] = useState<number | null>(null);
   const [pfOverride, setPfOverride] = useState<number | null>(null);
   const [ptOverride, setPtOverride] = useState<number | null>(null);
-  const [showComponentConfig, setShowComponentConfig] = useState(false);
+  const [showComponentConfig, setShowComponentConfig] = useState(true);
+
+  // Dynamic system defaults for salary components
+  const [systemDefaults, setSystemDefaults] = useState({
+    basicPercent: 50,
+    hraPercent: 30,
+    specialPercent: 20,
+    pfPercent: 12,
+    ptAmount: 200,
+    otMultiplier: 1.5,
+  });
+
+  useEffect(() => {
+    if (!isOpen) return;
+    fetch("/api/settings")
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.settings) {
+          setSystemDefaults({
+            basicPercent: data.settings.defaultBasicPercent ?? 50,
+            hraPercent: data.settings.defaultHraPercent ?? 30,
+            specialPercent: data.settings.defaultSpecialPercent ?? 20,
+            pfPercent: data.settings.defaultPfPercent ?? 12,
+            ptAmount: data.settings.defaultPtAmount ?? 200,
+            otMultiplier: data.settings.defaultOtMultiplier ?? 1.5,
+          });
+        }
+      })
+      .catch(console.error);
+  }, [isOpen]);
 
   const handleResetComponents = () => {
     setBasicOverride(null);
@@ -253,9 +282,9 @@ export default function SalarySlipModal({
   // Salary Calculations with Component Overrides
   const calculations = useMemo(() => {
     const grossBase = Number(monthlySalaryInput) || 0;
-    const defaultBasic = Math.round(grossBase * 0.5); // 50% Basic
-    const defaultHra = Math.round(grossBase * 0.3); // 30% HRA
-    const defaultSpecial = Math.round(grossBase * 0.2); // 20% Special/Conveyance
+    const defaultBasic = Math.round(grossBase * (systemDefaults.basicPercent / 100));
+    const defaultHra = Math.round(grossBase * (systemDefaults.hraPercent / 100));
+    const defaultSpecial = Math.round(grossBase * (systemDefaults.specialPercent / 100));
 
     // Hourly Rate for OT: either from input or calculated pro-rata
     const effectiveHourlyRate =
@@ -265,7 +294,7 @@ export default function SalarySlipModal({
         ? grossBase / (workingDays * 8)
         : 150;
 
-    const defaultOtPay = Math.round(overtimeHours * effectiveHourlyRate * 1.5);
+    const defaultOtPay = Math.round(overtimeHours * effectiveHourlyRate * systemDefaults.otMultiplier);
 
     const basic = basicOverride !== null ? basicOverride : defaultBasic;
     const hra = hraOverride !== null ? hraOverride : defaultHra;
@@ -278,8 +307,8 @@ export default function SalarySlipModal({
     // Deductions
     const perDaySalary = totalDaysInMonth > 0 ? grossBase / totalDaysInMonth : 0;
     const defaultLwp = Math.round(unpaidLeaves * perDaySalary);
-    const defaultPf = basic >= 15000 ? Math.round(basic * 0.12) : 0; // Standard PF
-    const defaultPt = grossBase >= 15000 ? 200 : 0; // Standard PT
+    const defaultPf = basic >= 15000 ? Math.round(basic * (systemDefaults.pfPercent / 100)) : 0;
+    const defaultPt = grossBase >= 15000 ? systemDefaults.ptAmount : 0;
 
     const lwpDeduction = lwpOverride !== null ? lwpOverride : defaultLwp;
     const pfDeduction = pfOverride !== null ? pfOverride : defaultPf;
@@ -338,6 +367,7 @@ export default function SalarySlipModal({
     lwpOverride,
     pfOverride,
     ptOverride,
+    systemDefaults,
   ]);
 
   const monthYearString = `${months[selectedMonth]} ${selectedYear}`;
@@ -982,8 +1012,8 @@ export default function SalarySlipModal({
                     <td className="py-2.5 px-4 text-right font-bold text-emerald-700">
                       {formatINR(bonusAmount)}
                     </td>
-                    <td className="py-2.5 px-4 border-l border-slate-200">&mdash;</td>
-                    <td className="py-2.5 px-4 text-right">&mdash;</td>
+                    <td className="py-2.5 px-4 border-l border-slate-200">—</td>
+                    <td className="py-2.5 px-4 text-right">—</td>
                   </tr>
                 )}
 

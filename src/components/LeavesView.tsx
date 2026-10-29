@@ -32,6 +32,7 @@ import {
   FileSpreadsheet,
   Layers,
   Zap,
+  Settings,
 } from "lucide-react";
 
 interface LeavesViewProps {
@@ -111,6 +112,62 @@ export default function LeavesView({
   const [editLeaveNotes, setEditLeaveNotes] = useState("");
   const [editLeaveSubmitting, setEditLeaveSubmitting] = useState(false);
   const [editLeaveError, setEditLeaveError] = useState<string | null>(null);
+
+  // Leave Settings Modal State (Admin: Configure Leave Types & Quotas)
+  const [isLeaveSettingsModalOpen, setIsLeaveSettingsModalOpen] = useState(false);
+  const [earnedDaysSetting, setEarnedDaysSetting] = useState<number>(18);
+  const [earnedAccrualSetting, setEarnedAccrualSetting] = useState<number>(1.5);
+  const [casualDaysSetting, setCasualDaysSetting] = useState<number>(0);
+  const [sickDaysSetting, setSickDaysSetting] = useState<number>(0);
+  const [unpaidEnabledSetting, setUnpaidEnabledSetting] = useState<boolean>(false);
+  const [leaveSettingsLoading, setLeaveSettingsLoading] = useState(false);
+  const [leaveSettingsMsg, setLeaveSettingsMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
+  const openLeaveSettings = async () => {
+    setLeaveSettingsMsg(null);
+    try {
+      const res = await fetch("/api/settings");
+      const data = await res.json();
+      if (data.settings) {
+        setEarnedDaysSetting(data.settings.earnedDays ?? 18);
+        setEarnedAccrualSetting(data.settings.earnedLeaveAccrual ?? 1.5);
+        setCasualDaysSetting(data.settings.casualDays ?? 0);
+        setSickDaysSetting(data.settings.sickDays ?? 0);
+        setUnpaidEnabledSetting(data.settings.unpaidEnabled ?? false);
+      }
+    } catch (e) {
+      console.error(e);
+    }
+    setIsLeaveSettingsModalOpen(true);
+  };
+
+  const handleSaveLeaveSettings = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLeaveSettingsLoading(true);
+    setLeaveSettingsMsg(null);
+    try {
+      const res = await fetch("/api/settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          earnedDays: earnedDaysSetting,
+          earnedLeaveAccrual: earnedAccrualSetting,
+          casualDays: casualDaysSetting,
+          sickDays: sickDaysSetting,
+          unpaidEnabled: unpaidEnabledSetting,
+          annualLeaveQuota: earnedDaysSetting + casualDaysSetting + sickDaysSetting,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to save leave quota settings.");
+      setLeaveSettingsMsg({ type: "success", text: "Leave types & quotas updated successfully! Cards refreshed." });
+      fetchLeaves();
+    } catch (err: any) {
+      setLeaveSettingsMsg({ type: "error", text: err.message || "Failed to update settings." });
+    } finally {
+      setLeaveSettingsLoading(false);
+    }
+  };
 
   const handleOpenEditLeave = (l: LeaveRequest) => {
     setEditLeaveModal(l);
@@ -609,6 +666,17 @@ export default function LeavesView({
         <div className="flex items-center gap-2.5 flex-wrap sm:flex-nowrap">
           {isAdmin && (
             <button
+              onClick={openLeaveSettings}
+              className="bg-blue-600 hover:bg-blue-500 text-white border border-blue-400/50 px-3.5 py-2.5 rounded-xl text-xs font-bold transition flex items-center space-x-1.5 shadow-md cursor-pointer"
+              title="Configure Leave Types & Annual Quotas for employees"
+            >
+              <Settings className="w-4 h-4 text-blue-200" />
+              <span>⚙️ Leave Settings (Types &amp; Quotas)</span>
+            </button>
+          )}
+
+          {isAdmin && (
+            <button
               onClick={() => {
                 setHolidayError(null);
                 setHolidaySuccessMsg(null);
@@ -900,72 +968,95 @@ export default function LeavesView({
             </div>
           </div>
 
-          <div className="flex items-center space-x-2 text-[11px] font-semibold text-slate-500">
-            <span className="inline-block w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
-            <span>Total Annual: 18 Days (Accruing 1.5 Days / Month as Earned Leave)</span>
+          <div className="flex items-center space-x-3 text-[11px] font-semibold text-slate-500">
+            <span className="flex items-center space-x-1.5">
+              <span className="inline-block w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
+              <span>
+                Total Annual:{" "}
+                {leaveSummary.find((i) => i.leaveType === "TOTAL")?.totalAvailable ?? 18} Days
+                {leaveSummary.some((i) => i.leaveType === "EARNED") && (
+                  <span className="text-slate-600 font-bold ml-1">
+                    (Accruing {leaveSummary.find((i) => i.leaveType === "EARNED")?.accrualRate ?? 1.5}d/mo Earned)
+                  </span>
+                )}
+              </span>
+            </span>
+            {isAdmin && (
+              <button
+                type="button"
+                onClick={openLeaveSettings}
+                className="text-blue-600 hover:text-blue-800 font-bold underline cursor-pointer text-[11px] ml-1 flex items-center space-x-1"
+                title="Configure leave types and quota days"
+              >
+                <span>⚙️ Configure Quotas</span>
+              </button>
+            )}
           </div>
         </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-3 pt-1">
-          {leaveSummary.map((item) => {
-            const isTotal = item.leaveType === "TOTAL";
-            const isUnpaid = item.leaveType === "UNPAID";
+        {/* Dynamic Cards: Only shows leave types configured with quotas > 0 */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 pt-1">
+          {leaveSummary
+            .filter((item) => item.totalAvailable > 0 || item.leaveType === "TOTAL" || (item.leaveType === "UNPAID" && item.taken > 0))
+            .map((item) => {
+              const isTotal = item.leaveType === "TOTAL";
+              const isUnpaid = item.leaveType === "UNPAID";
 
-            return (
-              <div
-                key={item.leaveType}
-                className={`p-3.5 rounded-xl border transition ${
-                  isTotal
-                    ? "bg-gradient-to-br from-rose-50 to-pink-50 border-rose-300 col-span-2 md:col-span-1 ring-1 ring-rose-200"
-                    : isUnpaid
-                    ? "bg-slate-50 border-slate-200"
-                    : "bg-white border-slate-200 hover:border-slate-300 shadow-2xs"
-                }`}
-              >
-                <div className="flex items-center justify-between">
-                  <span className={`text-[11px] font-bold uppercase tracking-wider ${isTotal ? "text-rose-900" : "text-slate-700"}`}>
-                    {item.label}
-                  </span>
-                  {isTotal && (
-                    <span className="text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded bg-rose-200 text-rose-900">
-                      Total
+              return (
+                <div
+                  key={item.leaveType}
+                  className={`p-3.5 rounded-xl border transition ${
+                    isTotal
+                      ? "bg-gradient-to-br from-rose-50 to-pink-50 border-rose-300 ring-1 ring-rose-200 shadow-xs"
+                      : isUnpaid
+                      ? "bg-slate-50 border-slate-200"
+                      : "bg-white border-slate-200 hover:border-slate-300 shadow-2xs"
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className={`text-[11px] font-bold uppercase tracking-wider ${isTotal ? "text-rose-900" : "text-slate-700"}`}>
+                      {item.label}
                     </span>
-                  )}
-                </div>
+                    {isTotal && (
+                      <span className="text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded bg-rose-200 text-rose-900">
+                        Total
+                      </span>
+                    )}
+                  </div>
 
-                <div className="mt-2.5 space-y-1.5 text-xs">
-                  <div className="flex items-center justify-between text-slate-500">
-                    <span>Available:</span>
-                    <span className="font-bold text-slate-800">
-                      {item.leaveType === "EARNED"
-                        ? "18d (1.5d/mo)"
-                        : item.totalAvailable > 0
-                        ? `${item.totalAvailable}d`
-                        : "&mdash;"}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between text-slate-500">
-                    <span>Taken:</span>
-                    <span className="font-bold text-rose-600">
-                      {item.taken}d
-                    </span>
-                  </div>
-                  <div className="pt-1.5 border-t border-slate-100 flex items-center justify-between font-bold">
-                    <span className={isTotal ? "text-rose-900" : "text-slate-700"}>Balance:</span>
-                    <span className={`px-2 py-0.5 rounded text-xs ${
-                      item.balance > 0
-                        ? "bg-emerald-100 text-emerald-800 font-extrabold"
-                        : isUnpaid
-                        ? "text-slate-500"
-                        : "bg-rose-100 text-rose-800 font-extrabold"
-                    }`}>
-                      {item.totalAvailable > 0 ? `${item.balance}d` : "&mdash;"}
-                    </span>
+                  <div className="mt-2.5 space-y-1.5 text-xs">
+                    <div className="flex items-center justify-between text-slate-500">
+                      <span>Available:</span>
+                      <span className="font-bold text-slate-800">
+                        {item.leaveType === "EARNED"
+                          ? `${item.totalAvailable}d (${item.accrualRate || 1.5}d/mo)`
+                          : item.totalAvailable > 0
+                          ? `${item.totalAvailable}d`
+                          : "—"}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between text-slate-500">
+                      <span>Taken:</span>
+                      <span className="font-bold text-rose-600">
+                        {item.taken}d
+                      </span>
+                    </div>
+                    <div className="pt-1.5 border-t border-slate-100 flex items-center justify-between font-bold">
+                      <span className={isTotal ? "text-rose-900" : "text-slate-700"}>Balance:</span>
+                      <span className={`px-2 py-0.5 rounded text-xs ${
+                        item.balance > 0
+                          ? "bg-emerald-100 text-emerald-800 font-extrabold"
+                          : isUnpaid
+                          ? "text-slate-500"
+                          : "bg-rose-100 text-rose-800 font-extrabold"
+                      }`}>
+                        {item.totalAvailable > 0 ? `${item.balance}d` : "—"}
+                      </span>
+                    </div>
                   </div>
                 </div>
-              </div>
-            );
-          })}
+              );
+            })}
         </div>
       </div>
 
@@ -2152,6 +2243,222 @@ export default function LeavesView({
                 </form>
               )}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Admin Leave Settings Modal: Configure Leave Types & Quotas */}
+      {isLeaveSettingsModalOpen && (
+        <div
+          className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150"
+          onClick={() => setIsLeaveSettingsModalOpen(false)}
+        >
+          <div
+            className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-lg w-full overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-gradient-to-r from-blue-900 to-indigo-900 text-white">
+              <div className="flex items-center space-x-2.5">
+                <Settings className="w-5 h-5 text-blue-300" />
+                <div>
+                  <h3 className="text-sm font-bold tracking-wide">
+                    Leave Types &amp; Annual Quota Settings
+                  </h3>
+                  <p className="text-[11px] text-blue-200">
+                    Set days for each leave type. Types with 0 days are removed from leave summary cards.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsLeaveSettingsModalOpen(false)}
+                className="text-white/70 hover:text-white p-1 rounded-lg hover:bg-white/10 transition cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <form onSubmit={handleSaveLeaveSettings} className="p-6 space-y-4 text-xs">
+              {leaveSettingsMsg && (
+                <div
+                  className={`p-3 rounded-xl border flex items-center space-x-2 ${
+                    leaveSettingsMsg.type === "success"
+                      ? "bg-emerald-50 border-emerald-200 text-emerald-800"
+                      : "bg-rose-50 border-rose-200 text-rose-800"
+                  }`}
+                >
+                  {leaveSettingsMsg.type === "success" ? (
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+                  ) : (
+                    <AlertCircle className="w-4 h-4 text-rose-600 flex-shrink-0" />
+                  )}
+                  <span className="font-semibold">{leaveSettingsMsg.text}</span>
+                </div>
+              )}
+
+              {/* Earned Leave Section */}
+              <div className="bg-blue-50/60 border border-blue-200 rounded-xl p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <Palmtree className="w-4 h-4 text-blue-700" />
+                    <span className="font-extrabold text-blue-950 text-xs uppercase tracking-wider">
+                      Earned Leave (EL) &bull; Primary Policy
+                    </span>
+                  </div>
+                  <span className="bg-blue-200 text-blue-900 text-[10px] font-extrabold px-2 py-0.5 rounded-full">
+                    Active
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                      Total Annual Days <span className="text-rose-500">*</span>
+                    </label>
+                    <input
+                      type="number"
+                      min={0}
+                      max={365}
+                      step={0.5}
+                      required
+                      value={earnedDaysSetting}
+                      onChange={(e) => {
+                        const val = parseFloat(e.target.value) || 0;
+                        setEarnedDaysSetting(val);
+                        setEarnedAccrualSetting(parseFloat((val / 12).toFixed(2)));
+                      }}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg font-bold text-slate-900 bg-white"
+                    />
+                    <span className="text-[10px] text-slate-500 mt-0.5 block">Standard: 18 days/year</span>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                      Monthly Accrual (Days/Mo)
+                    </label>
+                    <input
+                      type="number"
+                      min={0}
+                      max={30}
+                      step={0.1}
+                      required
+                      value={earnedAccrualSetting}
+                      onChange={(e) => setEarnedAccrualSetting(parseFloat(e.target.value) || 0)}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg font-bold text-slate-900 bg-white"
+                    />
+                    <span className="text-[10px] text-slate-500 mt-0.5 block">e.g. 1.5 days accrued / month</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Casual Leave Section */}
+              <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <Coffee className="w-4 h-4 text-amber-700" />
+                    <span className="font-extrabold text-slate-800 text-xs uppercase tracking-wider">
+                      Casual Leave (CL)
+                    </span>
+                  </div>
+                  <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full ${casualDaysSetting > 0 ? "bg-amber-100 text-amber-800" : "bg-slate-200 text-slate-600"}`}>
+                    {casualDaysSetting > 0 ? `${casualDaysSetting}d Configured` : "Removed (0d)"}
+                  </span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <input
+                    type="number"
+                    min={0}
+                    max={60}
+                    step={0.5}
+                    value={casualDaysSetting}
+                    onChange={(e) => setCasualDaysSetting(parseFloat(e.target.value) || 0)}
+                    className="w-28 px-3 py-1.5 border border-slate-300 rounded-lg font-bold text-slate-900 bg-white"
+                  />
+                  <p className="text-[11px] text-slate-500">
+                    Set to <span className="font-bold text-slate-700">0</span> to completely remove and hide Casual Leave from staff summary cards.
+                  </p>
+                </div>
+              </div>
+
+              {/* Sick Leave Section */}
+              <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <HeartPulse className="w-4 h-4 text-rose-700" />
+                    <span className="font-extrabold text-slate-800 text-xs uppercase tracking-wider">
+                      Sick Leave (SL)
+                    </span>
+                  </div>
+                  <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full ${sickDaysSetting > 0 ? "bg-rose-100 text-rose-800" : "bg-slate-200 text-slate-600"}`}>
+                    {sickDaysSetting > 0 ? `${sickDaysSetting}d Configured` : "Removed (0d)"}
+                  </span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <input
+                    type="number"
+                    min={0}
+                    max={60}
+                    step={0.5}
+                    value={sickDaysSetting}
+                    onChange={(e) => setSickDaysSetting(parseFloat(e.target.value) || 0)}
+                    className="w-28 px-3 py-1.5 border border-slate-300 rounded-lg font-bold text-slate-900 bg-white"
+                  />
+                  <p className="text-[11px] text-slate-500">
+                    Set to <span className="font-bold text-slate-700">0</span> to completely remove and hide Sick Leave from staff summary cards.
+                  </p>
+                </div>
+              </div>
+
+              {/* Unpaid / LWP Toggle */}
+              <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 flex items-center justify-between">
+                <div>
+                  <span className="font-bold text-slate-800 block text-xs">
+                    Unpaid Leave / Leave Without Pay (LWP) Card
+                  </span>
+                  <p className="text-[11px] text-slate-500 mt-0.5">
+                    Show LWP card in leave balance summary widget
+                  </p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={unpaidEnabledSetting}
+                    onChange={(e) => setUnpaidEnabledSetting(e.target.checked)}
+                    className="sr-only peer"
+                  />
+                  <div className="w-9 h-5 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
+                </label>
+              </div>
+
+              {/* Total Paid Quota Preview Pill */}
+              <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center justify-between text-xs">
+                <span className="font-bold text-emerald-900">Total Configured Annual Paid Quota:</span>
+                <span className="font-extrabold text-emerald-800 text-sm bg-white px-2.5 py-0.5 rounded-lg border border-emerald-300">
+                  {earnedDaysSetting + casualDaysSetting + sickDaysSetting} Days / Year
+                </span>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="pt-2 border-t border-slate-200 flex items-center justify-end space-x-2">
+                <button
+                  type="button"
+                  onClick={() => setIsLeaveSettingsModalOpen(false)}
+                  className="px-4 py-2 font-semibold text-slate-600 hover:bg-slate-100 rounded-lg transition cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={leaveSettingsLoading}
+                  className="px-5 py-2 font-bold bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition shadow-xs disabled:opacity-50 flex items-center space-x-1.5 cursor-pointer"
+                >
+                  <CheckCircle2 className="w-4 h-4" />
+                  <span>{leaveSettingsLoading ? "Saving Changes..." : "Save Leave Quotas"}</span>
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

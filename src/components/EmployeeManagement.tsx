@@ -26,6 +26,7 @@ import {
   DollarSign,
   Calendar,
   MapPin,
+  Coins,
 } from "lucide-react";
 import SalarySlipModal from "./SalarySlipModal";
 
@@ -41,6 +42,66 @@ export default function EmployeeManagement({
   const [employees, setEmployees] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
+
+  // Salary Components Modal State (Admin: Default Earning & Deduction Components)
+  const [showSalaryComponentsModal, setShowSalaryComponentsModal] = useState(false);
+  const [compBasicPercent, setCompBasicPercent] = useState<number>(50);
+  const [compHraPercent, setCompHraPercent] = useState<number>(30);
+  const [compSpecialPercent, setCompSpecialPercent] = useState<number>(20);
+  const [compPfPercent, setCompPfPercent] = useState<number>(12);
+  const [compPtAmount, setCompPtAmount] = useState<number>(200);
+  const [compOtMultiplier, setCompOtMultiplier] = useState<number>(1.5);
+  const [compLoading, setCompLoading] = useState(false);
+  const [compMessage, setCompMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
+  const openSalaryComponentsModal = async () => {
+    setCompMessage(null);
+    try {
+      const res = await fetch("/api/settings");
+      const data = await res.json();
+      if (data.settings) {
+        if (data.settings.defaultBasicPercent !== undefined) setCompBasicPercent(data.settings.defaultBasicPercent);
+        if (data.settings.defaultHraPercent !== undefined) setCompHraPercent(data.settings.defaultHraPercent);
+        if (data.settings.defaultSpecialPercent !== undefined) setCompSpecialPercent(data.settings.defaultSpecialPercent);
+        if (data.settings.defaultPfPercent !== undefined) setCompPfPercent(data.settings.defaultPfPercent);
+        if (data.settings.defaultPtAmount !== undefined) setCompPtAmount(data.settings.defaultPtAmount);
+        if (data.settings.defaultOtMultiplier !== undefined) setCompOtMultiplier(data.settings.defaultOtMultiplier);
+      }
+    } catch (e) {
+      console.error(e);
+    }
+    setShowSalaryComponentsModal(true);
+  };
+
+  const handleSaveSalaryComponents = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setCompLoading(true);
+    setCompMessage(null);
+    try {
+      const res = await fetch("/api/settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          defaultBasicPercent: compBasicPercent,
+          defaultHraPercent: compHraPercent,
+          defaultSpecialPercent: compSpecialPercent,
+          defaultPfPercent: compPfPercent,
+          defaultPtAmount: compPtAmount,
+          defaultOtMultiplier: compOtMultiplier,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to save salary components.");
+      setCompMessage({
+        type: "success",
+        text: "Salary & deduction components saved successfully! Applied across all employee payslips.",
+      });
+    } catch (err: any) {
+      setCompMessage({ type: "error", text: err.message || "Failed to save components." });
+    } finally {
+      setCompLoading(false);
+    }
+  };
 
   // Add Form State
   const [name, setName] = useState("");
@@ -268,13 +329,24 @@ export default function EmployeeManagement({
           </p>
         </div>
 
-        <button
-          onClick={() => setShowAddModal(true)}
-          className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-4 py-2.5 rounded-lg text-xs transition shadow-sm flex items-center space-x-1.5 flex-shrink-0 cursor-pointer"
-        >
-          <UserPlus className="w-4 h-4" />
-          <span>+ Add Employee Profile</span>
-        </button>
+        <div className="flex items-center gap-2.5 flex-wrap sm:flex-nowrap">
+          <button
+            onClick={openSalaryComponentsModal}
+            className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-4 py-2.5 rounded-lg text-xs transition shadow-sm flex items-center space-x-1.5 flex-shrink-0 cursor-pointer"
+            title="Configure standard earning and deduction component proportions"
+          >
+            <Coins className="w-4 h-4" />
+            <span>💰 Set Earning &amp; Deduction Components</span>
+          </button>
+
+          <button
+            onClick={() => setShowAddModal(true)}
+            className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-4 py-2.5 rounded-lg text-xs transition shadow-sm flex items-center space-x-1.5 flex-shrink-0 cursor-pointer"
+          >
+            <UserPlus className="w-4 h-4" />
+            <span>+ Add Employee Profile</span>
+          </button>
+        </div>
       </div>
 
       {/* Employees Table */}
@@ -372,7 +444,7 @@ export default function EmployeeManagement({
                           {emp.panNumber || <span className="text-slate-400 font-normal italic">No PAN</span>}
                         </div>
                         <div className="text-[10px] text-slate-500 mt-0.5">
-                          {emp.joiningDate ? `DOJ: ${emp.joiningDate}` : "DOJ: &mdash;"}
+                          {emp.joiningDate ? `DOJ: ${emp.joiningDate}` : "DOJ: —"}
                         </div>
                       </td>
 
@@ -1022,6 +1094,236 @@ export default function EmployeeManagement({
                   className="px-5 py-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition shadow-sm disabled:opacity-50"
                 >
                   {editLoading ? "Saving Changes..." : "Save Changes"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Admin Salary Components Modal: Set Earning & Deduction Components */}
+      {showSalaryComponentsModal && (
+        <div
+          className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150"
+          onClick={() => setShowSalaryComponentsModal(false)}
+        >
+          <div
+            className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-lg w-full overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-gradient-to-r from-emerald-800 to-teal-800 text-white">
+              <div className="flex items-center space-x-2.5">
+                <Coins className="w-5 h-5 text-emerald-300" />
+                <div>
+                  <h3 className="text-sm font-bold tracking-wide">
+                    Set Earning &amp; Deduction Components
+                  </h3>
+                  <p className="text-[11px] text-emerald-200">
+                    Standard percentages &amp; statutory deductions for employee salary slips
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowSalaryComponentsModal(false)}
+                className="text-white/70 hover:text-white p-1 rounded-lg hover:bg-white/10 transition cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <form onSubmit={handleSaveSalaryComponents} className="p-6 space-y-4 text-xs">
+              {compMessage && (
+                <div
+                  className={`p-3 rounded-xl border flex items-center space-x-2 ${
+                    compMessage.type === "success"
+                      ? "bg-emerald-50 border-emerald-200 text-emerald-800"
+                      : "bg-rose-50 border-rose-200 text-rose-800"
+                  }`}
+                >
+                  {compMessage.type === "success" ? (
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+                  ) : (
+                    <AlertCircle className="w-4 h-4 text-rose-600 flex-shrink-0" />
+                  )}
+                  <span className="font-semibold">{compMessage.text}</span>
+                </div>
+              )}
+
+              <div className="bg-emerald-50/60 border border-emerald-200 p-3.5 rounded-xl space-y-1">
+                <span className="font-bold text-emerald-950 text-xs flex items-center gap-1.5">
+                  <Coins className="w-3.5 h-3.5 text-emerald-700" /> Company-wide Standard CTC Breakdown
+                </span>
+                <p className="text-[11px] text-emerald-800">
+                  When calculating employee salary slips, these percentages automatically partition gross CTC into Basic Pay, HRA, and Special Allowances.
+                </p>
+              </div>
+
+              {/* Earnings Components */}
+              <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-3">
+                <div className="flex items-center justify-between border-b border-slate-200 pb-2">
+                  <span className="font-extrabold text-slate-800 text-xs uppercase tracking-wider">
+                    Earnings Breakdown (% of CTC)
+                  </span>
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                    compBasicPercent + compHraPercent + compSpecialPercent === 100
+                      ? "bg-emerald-100 text-emerald-800"
+                      : "bg-amber-100 text-amber-800"
+                  }`}>
+                    Sum: {compBasicPercent + compHraPercent + compSpecialPercent}% CTC
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                      Basic Salary
+                    </label>
+                    <div className="flex items-center gap-1.5">
+                      <input
+                        type="number"
+                        min={10}
+                        max={100}
+                        step={1}
+                        required
+                        value={compBasicPercent}
+                        onChange={(e) => setCompBasicPercent(parseFloat(e.target.value) || 0)}
+                        className="w-full px-3 py-1.5 border border-slate-300 rounded-lg font-bold text-slate-900 bg-white"
+                      />
+                      <span className="text-xs font-bold text-slate-600">%</span>
+                    </div>
+                    <span className="text-[10px] text-slate-500 mt-0.5 block">Standard: 50%</span>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                      HRA
+                    </label>
+                    <div className="flex items-center gap-1.5">
+                      <input
+                        type="number"
+                        min={0}
+                        max={100}
+                        step={1}
+                        required
+                        value={compHraPercent}
+                        onChange={(e) => setCompHraPercent(parseFloat(e.target.value) || 0)}
+                        className="w-full px-3 py-1.5 border border-slate-300 rounded-lg font-bold text-slate-900 bg-white"
+                      />
+                      <span className="text-xs font-bold text-slate-600">%</span>
+                    </div>
+                    <span className="text-[10px] text-slate-500 mt-0.5 block">Standard: 30%</span>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                      Special Allowance
+                    </label>
+                    <div className="flex items-center gap-1.5">
+                      <input
+                        type="number"
+                        min={0}
+                        max={100}
+                        step={1}
+                        required
+                        value={compSpecialPercent}
+                        onChange={(e) => setCompSpecialPercent(parseFloat(e.target.value) || 0)}
+                        className="w-full px-3 py-1.5 border border-slate-300 rounded-lg font-bold text-slate-900 bg-white"
+                      />
+                      <span className="text-xs font-bold text-slate-600">%</span>
+                    </div>
+                    <span className="text-[10px] text-slate-500 mt-0.5 block">Standard: 20%</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Deductions Components */}
+              <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-3">
+                <span className="font-extrabold text-slate-800 text-xs uppercase tracking-wider block border-b border-slate-200 pb-2">
+                  Overtime &amp; Statutory Deductions
+                </span>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                      OT Multiplier
+                    </label>
+                    <div className="flex items-center gap-1.5">
+                      <input
+                        type="number"
+                        min={1}
+                        max={3}
+                        step={0.1}
+                        required
+                        value={compOtMultiplier}
+                        onChange={(e) => setCompOtMultiplier(parseFloat(e.target.value) || 1)}
+                        className="w-full px-3 py-1.5 border border-slate-300 rounded-lg font-bold text-slate-900 bg-white"
+                      />
+                      <span className="text-xs font-bold text-slate-600">&times;</span>
+                    </div>
+                    <span className="text-[10px] text-slate-500 mt-0.5 block">Standard: 1.5&times; rate</span>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                      Provident Fund (PF)
+                    </label>
+                    <div className="flex items-center gap-1.5">
+                      <input
+                        type="number"
+                        min={0}
+                        max={20}
+                        step={0.5}
+                        required
+                        value={compPfPercent}
+                        onChange={(e) => setCompPfPercent(parseFloat(e.target.value) || 0)}
+                        className="w-full px-3 py-1.5 border border-slate-300 rounded-lg font-bold text-slate-900 bg-white"
+                      />
+                      <span className="text-xs font-bold text-slate-600">%</span>
+                    </div>
+                    <span className="text-[10px] text-slate-500 mt-0.5 block">12% on Basic &ge; 15k</span>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                      Professional Tax (PT)
+                    </label>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-xs font-bold text-slate-600">₹</span>
+                      <input
+                        type="number"
+                        min={0}
+                        max={1000}
+                        step={10}
+                        required
+                        value={compPtAmount}
+                        onChange={(e) => setCompPtAmount(parseFloat(e.target.value) || 0)}
+                        className="w-full px-3 py-1.5 border border-slate-300 rounded-lg font-bold text-slate-900 bg-white"
+                      />
+                    </div>
+                    <span className="text-[10px] text-slate-500 mt-0.5 block">Standard: ₹200 / mo</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="pt-3 border-t border-slate-200 flex items-center justify-end space-x-2">
+                <button
+                  type="button"
+                  onClick={() => setShowSalaryComponentsModal(false)}
+                  className="px-4 py-2 font-semibold text-slate-600 hover:bg-slate-100 rounded-lg transition cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={compLoading}
+                  className="px-5 py-2 font-bold bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition shadow-xs disabled:opacity-50 flex items-center space-x-1.5 cursor-pointer"
+                >
+                  <CheckCircle2 className="w-4 h-4" />
+                  <span>{compLoading ? "Saving..." : "Save Salary Components"}</span>
                 </button>
               </div>
             </form>

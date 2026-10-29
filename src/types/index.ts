@@ -233,6 +233,7 @@ export interface LeaveSummaryItem {
   leaveType: string;
   label: string;
   totalAvailable: number;
+  accrualRate?: number;
   taken: number;
   balance: number;
 }

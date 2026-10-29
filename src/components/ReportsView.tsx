@@ -952,7 +952,7 @@ export default function ReportsView({ currentUser, allUsers }: ReportsViewProps)
                                     {formatDuration(t.durationSeconds)}
                                   </td>
                                   <td className="py-2.5 px-3 font-bold text-slate-800 text-center">
-                                    {t.billableHours ? `${t.billableHours} hrs` : "&mdash;"}
+                                    {t.billableHours ? `${t.billableHours} hrs` : "—"}
                                   </td>
                                   <td className="py-2.5 px-3 text-right">
                                     <span
@@ -1087,7 +1087,7 @@ export default function ReportsView({ currentUser, allUsers }: ReportsViewProps)
                           <td className="py-3 px-4 text-slate-600">
                             {c.assignedEmployees && c.assignedEmployees.length > 0
                               ? c.assignedEmployees.join(", ")
-                              : "&mdash;"}
+                              : "—"}
                           </td>
                         </tr>
                       );
@@ -1354,7 +1354,7 @@ export default function ReportsView({ currentUser, allUsers }: ReportsViewProps)
                           {item.date}
                         </td>
                         <td className="py-3 px-4 text-center font-bold text-slate-800">
-                          {item.billableHours ? `${item.billableHours}h` : "&mdash;"}
+                          {item.billableHours ? `${item.billableHours}h` : "—"}
                         </td>
                         <td className="py-3 px-4 text-center font-mono font-bold text-blue-700">
                           {item.actualHours}h

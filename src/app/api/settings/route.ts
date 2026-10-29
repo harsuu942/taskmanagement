@@ -24,8 +24,20 @@ export async function GET() {
     const companyDailyHours = parseFloat(settingsMap["COMPANY_DAILY_HOURS"] || "8");
     const enableSundayOt = settingsMap["ENABLE_SUNDAY_OT"] !== "false";
     const standardWorkDays = parseInt(settingsMap["STANDARD_WORK_DAYS"] || "26");
-    const annualLeaveQuota = parseFloat(settingsMap["ANNUAL_LEAVE_QUOTA"] || "18");
+    const earnedDays = parseFloat(settingsMap["EARNED_LEAVE_DAYS"] || settingsMap["ANNUAL_LEAVE_QUOTA"] || "18");
     const earnedLeaveAccrual = parseFloat(settingsMap["EARNED_LEAVE_ACCRUAL"] || "1.5");
+    const casualDays = parseFloat(settingsMap["CASUAL_LEAVE_DAYS"] || "0");
+    const sickDays = parseFloat(settingsMap["SICK_LEAVE_DAYS"] || "0");
+    const unpaidEnabled = settingsMap["UNPAID_LEAVE_ENABLED"] === "true";
+    const annualLeaveQuota = earnedDays + casualDays + sickDays;
+
+    // Salary & Deduction Components Defaults
+    const defaultBasicPercent = parseFloat(settingsMap["DEFAULT_BASIC_PERCENT"] || "50");
+    const defaultHraPercent = parseFloat(settingsMap["DEFAULT_HRA_PERCENT"] || "30");
+    const defaultSpecialPercent = parseFloat(settingsMap["DEFAULT_SPECIAL_PERCENT"] || "20");
+    const defaultPfPercent = parseFloat(settingsMap["DEFAULT_PF_PERCENT"] || "12");
+    const defaultPtAmount = parseFloat(settingsMap["DEFAULT_PT_AMOUNT"] || "200");
+    const defaultOtMultiplier = parseFloat(settingsMap["DEFAULT_OT_MULTIPLIER"] || "1.5");
 
     return NextResponse.json({
       settings: {
@@ -38,7 +50,17 @@ export async function GET() {
         enableSundayOt,
         standardWorkDays,
         annualLeaveQuota,
+        earnedDays,
         earnedLeaveAccrual,
+        casualDays,
+        sickDays,
+        unpaidEnabled,
+        defaultBasicPercent,
+        defaultHraPercent,
+        defaultSpecialPercent,
+        defaultPfPercent,
+        defaultPtAmount,
+        defaultOtMultiplier,
       },
     });
   } catch (error: any) {
@@ -60,6 +82,16 @@ export async function POST(request: Request) {
       standardWorkDays,
       annualLeaveQuota,
       earnedLeaveAccrual,
+      earnedDays,
+      casualDays,
+      sickDays,
+      unpaidEnabled,
+      defaultBasicPercent,
+      defaultHraPercent,
+      defaultSpecialPercent,
+      defaultPfPercent,
+      defaultPtAmount,
+      defaultOtMultiplier,
     } = body;
 
     // Optional Action: Test Gmail SMTP Connection
@@ -153,6 +185,86 @@ export async function POST(request: Request) {
         where: { key: "EARNED_LEAVE_ACCRUAL" },
         create: { key: "EARNED_LEAVE_ACCRUAL", value: String(earnedLeaveAccrual) },
         update: { value: String(earnedLeaveAccrual) },
+      });
+    }
+
+    if (earnedDays !== undefined) {
+      await prisma.systemSetting.upsert({
+        where: { key: "EARNED_LEAVE_DAYS" },
+        create: { key: "EARNED_LEAVE_DAYS", value: String(earnedDays) },
+        update: { value: String(earnedDays) },
+      });
+    }
+
+    if (casualDays !== undefined) {
+      await prisma.systemSetting.upsert({
+        where: { key: "CASUAL_LEAVE_DAYS" },
+        create: { key: "CASUAL_LEAVE_DAYS", value: String(casualDays) },
+        update: { value: String(casualDays) },
+      });
+    }
+
+    if (sickDays !== undefined) {
+      await prisma.systemSetting.upsert({
+        where: { key: "SICK_LEAVE_DAYS" },
+        create: { key: "SICK_LEAVE_DAYS", value: String(sickDays) },
+        update: { value: String(sickDays) },
+      });
+    }
+
+    if (unpaidEnabled !== undefined) {
+      await prisma.systemSetting.upsert({
+        where: { key: "UNPAID_LEAVE_ENABLED" },
+        create: { key: "UNPAID_LEAVE_ENABLED", value: String(unpaidEnabled) },
+        update: { value: String(unpaidEnabled) },
+      });
+    }
+
+    if (defaultBasicPercent !== undefined) {
+      await prisma.systemSetting.upsert({
+        where: { key: "DEFAULT_BASIC_PERCENT" },
+        create: { key: "DEFAULT_BASIC_PERCENT", value: String(defaultBasicPercent) },
+        update: { value: String(defaultBasicPercent) },
+      });
+    }
+
+    if (defaultHraPercent !== undefined) {
+      await prisma.systemSetting.upsert({
+        where: { key: "DEFAULT_HRA_PERCENT" },
+        create: { key: "DEFAULT_HRA_PERCENT", value: String(defaultHraPercent) },
+        update: { value: String(defaultHraPercent) },
+      });
+    }
+
+    if (defaultSpecialPercent !== undefined) {
+      await prisma.systemSetting.upsert({
+        where: { key: "DEFAULT_SPECIAL_PERCENT" },
+        create: { key: "DEFAULT_SPECIAL_PERCENT", value: String(defaultSpecialPercent) },
+        update: { value: String(defaultSpecialPercent) },
+      });
+    }
+
+    if (defaultPfPercent !== undefined) {
+      await prisma.systemSetting.upsert({
+        where: { key: "DEFAULT_PF_PERCENT" },
+        create: { key: "DEFAULT_PF_PERCENT", value: String(defaultPfPercent) },
+        update: { value: String(defaultPfPercent) },
+      });
+    }
+
+    if (defaultPtAmount !== undefined) {
+      await prisma.systemSetting.upsert({
+        where: { key: "DEFAULT_PT_AMOUNT" },
+        create: { key: "DEFAULT_PT_AMOUNT", value: String(defaultPtAmount) },
+        update: { value: String(defaultPtAmount) },
+      });
+    }
+
+    if (defaultOtMultiplier !== undefined) {
+      await prisma.systemSetting.upsert({
+        where: { key: "DEFAULT_OT_MULTIPLIER" },
+        create: { key: "DEFAULT_OT_MULTIPLIER", value: String(defaultOtMultiplier) },
+        update: { value: String(defaultOtMultiplier) },
       });
     }
 

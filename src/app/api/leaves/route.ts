@@ -128,56 +128,90 @@ export async function GET(request: Request) {
 
     const totalPaidTaken = parseFloat((casualTaken + sickTaken + earnedTaken).toFixed(2));
     
-    // Fetch dynamic annual leave quota set by Admin
-    const quotaSetting = await prisma.systemSetting.findUnique({
-      where: { key: "ANNUAL_LEAVE_QUOTA" },
+    // Fetch dynamic leave settings configured by Admin
+    const allSettings = await prisma.systemSetting.findMany({
+      where: {
+        key: {
+          in: [
+            "ANNUAL_LEAVE_QUOTA",
+            "EARNED_LEAVE_DAYS",
+            "EARNED_LEAVE_ACCRUAL",
+            "CASUAL_LEAVE_DAYS",
+            "SICK_LEAVE_DAYS",
+            "UNPAID_LEAVE_ENABLED",
+          ],
+        },
+      },
     });
-    const accrualSetting = await prisma.systemSetting.findUnique({
-      where: { key: "EARNED_LEAVE_ACCRUAL" },
+    const sMap: Record<string, string> = {};
+    allSettings.forEach((s) => {
+      sMap[s.key] = s.value;
     });
-    const totalAnnualQuota = quotaSetting ? parseFloat(quotaSetting.value) || 18 : 18;
-    const earnedLeaveAccrual = accrualSetting ? parseFloat(accrualSetting.value) || 1.5 : 1.5;
 
-    const totalBalance = parseFloat(Math.max(0, totalAnnualQuota - totalPaidTaken).toFixed(2));
+    const earnedDays = parseFloat(sMap["EARNED_LEAVE_DAYS"] || sMap["ANNUAL_LEAVE_QUOTA"] || "18");
+    const earnedLeaveAccrual = parseFloat(sMap["EARNED_LEAVE_ACCRUAL"] || "1.5");
+    const casualDays = parseFloat(sMap["CASUAL_LEAVE_DAYS"] || "0");
+    const sickDays = parseFloat(sMap["SICK_LEAVE_DAYS"] || "0");
+    const unpaidEnabled = sMap["UNPAID_LEAVE_ENABLED"] === "true";
 
-    const leaveSummary = [
-      {
+    const totalPaidQuota = parseFloat((earnedDays + casualDays + sickDays).toFixed(2));
+    const totalBalance = parseFloat(Math.max(0, totalPaidQuota - totalPaidTaken).toFixed(2));
+
+    const leaveSummary: any[] = [];
+
+    // 1. Earned Leave (EL) - Only if quota > 0
+    if (earnedDays > 0) {
+      leaveSummary.push({
         leaveType: "EARNED",
         label: "Earned Leave (EL)",
-        totalAvailable: totalAnnualQuota, // e.g. 1.5 days/mo * 12 = 18 days
+        totalAvailable: earnedDays,
         accrualRate: earnedLeaveAccrual,
         taken: parseFloat(earnedTaken.toFixed(2)),
-        balance: parseFloat(Math.max(0, totalAnnualQuota - earnedTaken).toFixed(2)),
-      },
-      {
+        balance: parseFloat(Math.max(0, earnedDays - earnedTaken).toFixed(2)),
+      });
+    }
+
+    // 2. Casual Leave - Only if Admin configured a quota > 0
+    if (casualDays > 0) {
+      leaveSummary.push({
         leaveType: "CASUAL",
         label: "Casual Leave",
-        totalAvailable: 0,
+        totalAvailable: casualDays,
         taken: parseFloat(casualTaken.toFixed(2)),
-        balance: totalBalance,
-      },
-      {
+        balance: parseFloat(Math.max(0, casualDays - casualTaken).toFixed(2)),
+      });
+    }
+
+    // 3. Sick Leave - Only if Admin configured a quota > 0
+    if (sickDays > 0) {
+      leaveSummary.push({
         leaveType: "SICK",
         label: "Sick Leave",
-        totalAvailable: 0,
+        totalAvailable: sickDays,
         taken: parseFloat(sickTaken.toFixed(2)),
-        balance: totalBalance,
-      },
-      {
+        balance: parseFloat(Math.max(0, sickDays - sickTaken).toFixed(2)),
+      });
+    }
+
+    // 4. Unpaid Leave - Only if explicitly enabled by Admin
+    if (unpaidEnabled) {
+      leaveSummary.push({
         leaveType: "UNPAID",
         label: "Unpaid / LWP",
         totalAvailable: 0,
         taken: parseFloat(unpaidTaken.toFixed(2)),
         balance: 0,
-      },
-      {
-        leaveType: "TOTAL",
-        label: "Total Annual Quota",
-        totalAvailable: totalAnnualQuota,
-        taken: totalPaidTaken,
-        balance: totalBalance,
-      },
-    ];
+      });
+    }
+
+    // 5. Total Annual Quota
+    leaveSummary.push({
+      leaveType: "TOTAL",
+      label: "Total Annual Quota",
+      totalAvailable: totalPaidQuota,
+      taken: totalPaidTaken,
+      balance: totalBalance,
+    });
 
     return NextResponse.json({
       leaves: filteredLeaves,
