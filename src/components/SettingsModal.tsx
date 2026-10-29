@@ -1,7 +1,13 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { User } from "@/types";
+import {
+  User,
+  CustomLeaveTypeConfig,
+  SalaryComponentsConfig,
+  SalaryEarningComponent,
+  SalaryDeductionComponent,
+} from "@/types";
 import {
   X,
   Mail,
@@ -23,6 +29,8 @@ import {
   Coins,
   Coffee,
   HeartPulse,
+  Plus,
+  Trash2,
 } from "lucide-react";
 
 interface SettingsModalProps {
@@ -63,22 +71,35 @@ export default function SettingsModal({
   const [testEmailLoading, setTestEmailLoading] = useState(false);
   const [testEmailMessage, setTestEmailMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
-  // Leave Types & Quotas State
-  const [earnedDays, setEarnedDays] = useState<number>(18);
-  const [earnedLeaveAccrual, setEarnedLeaveAccrual] = useState<number>(1.5);
-  const [casualDays, setCasualDays] = useState<number>(0);
-  const [sickDays, setSickDays] = useState<number>(0);
-  const [unpaidEnabled, setUnpaidEnabled] = useState<boolean>(false);
+  // Leave Types & Quotas State (Dynamic)
+  const [leaveTypesConfigList, setLeaveTypesConfigList] = useState<CustomLeaveTypeConfig[]>([]);
+  const [newTypeName, setNewTypeName] = useState("");
+  const [newTypeDays, setNewTypeDays] = useState<number>(10);
+  const [newTypeAccrual, setNewTypeAccrual] = useState<number>(0);
+  const [newTypeIsPaid, setNewTypeIsPaid] = useState<boolean>(true);
   const [leaveLoading, setLeaveLoading] = useState(false);
   const [leaveMessage, setLeaveMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
-  // Salary & Deduction Components State
-  const [defaultBasicPercent, setDefaultBasicPercent] = useState<number>(50);
-  const [defaultHraPercent, setDefaultHraPercent] = useState<number>(30);
-  const [defaultSpecialPercent, setDefaultSpecialPercent] = useState<number>(20);
-  const [defaultPfPercent, setDefaultPfPercent] = useState<number>(12);
-  const [defaultPtAmount, setDefaultPtAmount] = useState<number>(200);
-  const [defaultOtMultiplier, setDefaultOtMultiplier] = useState<number>(1.5);
+  // Salary & Deduction Components State (Dynamic)
+  const [salaryComponentsConfig, setSalaryComponentsConfig] = useState<SalaryComponentsConfig>({
+    earnings: [
+      { id: "basic", name: "Basic Salary", type: "PERCENT_CTC", value: 50, isDefault: true },
+      { id: "hra", name: "House Rent Allowance (HRA)", type: "PERCENT_CTC", value: 30, isDefault: true },
+      { id: "special", name: "Special Allowance", type: "PERCENT_CTC", value: 20, isDefault: true },
+    ],
+    deductions: [
+      { id: "pf", name: "Provident Fund (PF)", type: "PERCENT_BASIC", value: 12, threshold: 15000, isDefault: true },
+      { id: "pt", name: "Professional Tax (PT)", type: "FIXED", value: 200, threshold: 15000, isDefault: true },
+    ],
+    otMultiplier: 1.5,
+  });
+  const [newEarningName, setNewEarningName] = useState("");
+  const [newEarningType, setNewEarningType] = useState<"PERCENT_CTC" | "FIXED">("PERCENT_CTC");
+  const [newEarningValue, setNewEarningValue] = useState<number>(5);
+  const [newDeductionName, setNewDeductionName] = useState("");
+  const [newDeductionType, setNewDeductionType] = useState<"PERCENT_BASIC" | "PERCENT_CTC" | "FIXED">("FIXED");
+  const [newDeductionValue, setNewDeductionValue] = useState<number>(200);
+  const [newDeductionThreshold, setNewDeductionThreshold] = useState<number>(15000);
   const [salaryLoading, setSalaryLoading] = useState(false);
   const [salaryMessage, setSalaryMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
@@ -118,17 +139,34 @@ export default function SettingsModal({
           if (data.settings.companyDailyHours !== undefined) setCompanyDailyHours(data.settings.companyDailyHours);
           if (data.settings.enableSundayOt !== undefined) setEnableSundayOt(data.settings.enableSundayOt);
           if (data.settings.standardWorkDays !== undefined) setStandardWorkDays(data.settings.standardWorkDays);
-          if (data.settings.earnedDays !== undefined) setEarnedDays(data.settings.earnedDays);
-          if (data.settings.earnedLeaveAccrual !== undefined) setEarnedLeaveAccrual(data.settings.earnedLeaveAccrual);
-          if (data.settings.casualDays !== undefined) setCasualDays(data.settings.casualDays);
-          if (data.settings.sickDays !== undefined) setSickDays(data.settings.sickDays);
-          if (data.settings.unpaidEnabled !== undefined) setUnpaidEnabled(data.settings.unpaidEnabled);
-          if (data.settings.defaultBasicPercent !== undefined) setDefaultBasicPercent(data.settings.defaultBasicPercent);
-          if (data.settings.defaultHraPercent !== undefined) setDefaultHraPercent(data.settings.defaultHraPercent);
-          if (data.settings.defaultSpecialPercent !== undefined) setDefaultSpecialPercent(data.settings.defaultSpecialPercent);
-          if (data.settings.defaultPfPercent !== undefined) setDefaultPfPercent(data.settings.defaultPfPercent);
-          if (data.settings.defaultPtAmount !== undefined) setDefaultPtAmount(data.settings.defaultPtAmount);
-          if (data.settings.defaultOtMultiplier !== undefined) setDefaultOtMultiplier(data.settings.defaultOtMultiplier);
+
+          if (data.settings.leaveTypesConfig && Array.isArray(data.settings.leaveTypesConfig)) {
+            setLeaveTypesConfigList(data.settings.leaveTypesConfig);
+          } else {
+            setLeaveTypesConfigList([
+              { id: "EARNED", name: "Earned Leave (EL)", annualDays: data.settings.earnedDays ?? 18, accrualRate: data.settings.earnedLeaveAccrual ?? 1.5, isPaid: true, isDefault: true },
+              { id: "CASUAL", name: "Casual Leave (CL)", annualDays: data.settings.casualDays ?? 0, accrualRate: 0, isPaid: true, isDefault: true },
+              { id: "SICK", name: "Sick Leave (SL)", annualDays: data.settings.sickDays ?? 0, accrualRate: 0, isPaid: true, isDefault: true },
+              { id: "UNPAID", name: "Unpaid Leave (LWP)", annualDays: 0, accrualRate: 0, isPaid: false, isDefault: true },
+            ]);
+          }
+
+          if (data.settings.salaryComponentsConfig) {
+            setSalaryComponentsConfig(data.settings.salaryComponentsConfig);
+          } else {
+            setSalaryComponentsConfig({
+              earnings: [
+                { id: "basic", name: "Basic Salary", type: "PERCENT_CTC", value: data.settings.defaultBasicPercent ?? 50, isDefault: true },
+                { id: "hra", name: "House Rent Allowance (HRA)", type: "PERCENT_CTC", value: data.settings.defaultHraPercent ?? 30, isDefault: true },
+                { id: "special", name: "Special Allowance", type: "PERCENT_CTC", value: data.settings.defaultSpecialPercent ?? 20, isDefault: true },
+              ],
+              deductions: [
+                { id: "pf", name: "Provident Fund (PF)", type: "PERCENT_BASIC", value: data.settings.defaultPfPercent ?? 12, threshold: 15000, isDefault: true },
+                { id: "pt", name: "Professional Tax (PT)", type: "FIXED", value: data.settings.defaultPtAmount ?? 200, threshold: 15000, isDefault: true },
+              ],
+              otMultiplier: data.settings.defaultOtMultiplier ?? 1.5,
+            });
+          }
         }
       })
       .catch(console.error);
@@ -303,25 +341,140 @@ export default function SettingsModal({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          earnedDays,
-          earnedLeaveAccrual,
-          casualDays,
-          sickDays,
-          unpaidEnabled,
-          annualLeaveQuota: earnedDays + casualDays + sickDays,
+          leaveTypesConfig: leaveTypesConfigList,
         }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to save leave quota settings.");
       setLeaveMessage({
         type: "success",
-        text: "Leave types & annual quotas updated successfully! Types with 0 days are removed from cards.",
+        text: "Leave types & annual quotas updated successfully! Staff summary cards updated.",
       });
     } catch (err: any) {
       setLeaveMessage({ type: "error", text: err.message || "Failed to save settings." });
     } finally {
       setLeaveLoading(false);
     }
+  };
+
+  // Leave Types Helpers
+  const handleUpdateLeaveTypeField = (index: number, patch: Partial<CustomLeaveTypeConfig>) => {
+    setLeaveTypesConfigList((prev) => {
+      const copy = [...prev];
+      copy[index] = { ...copy[index], ...patch };
+      return copy;
+    });
+  };
+
+  const handleAddCustomLeaveType = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newTypeName.trim()) return;
+    const cleanId = newTypeName
+      .trim()
+      .toUpperCase()
+      .replace(/[^A-Z0-9]/g, "_")
+      .slice(0, 16) + "_" + Math.floor(100 + Math.random() * 900);
+
+    const newEntry: CustomLeaveTypeConfig = {
+      id: cleanId,
+      name: newTypeName.trim(),
+      annualDays: Number(newTypeDays) || 0,
+      accrualRate: Number(newTypeAccrual) || 0,
+      isPaid: newTypeIsPaid,
+      isDefault: false,
+    };
+
+    setLeaveTypesConfigList((prev) => [...prev, newEntry]);
+    setNewTypeName("");
+    setNewTypeDays(10);
+    setNewTypeAccrual(0);
+    setNewTypeIsPaid(true);
+  };
+
+  const handleDeleteCustomLeaveType = (index: number) => {
+    setLeaveTypesConfigList((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  // Salary Components Helpers
+  const handleUpdateEarning = (index: number, patch: Partial<SalaryEarningComponent>) => {
+    setSalaryComponentsConfig((prev) => {
+      const earnings = [...prev.earnings];
+      earnings[index] = { ...earnings[index], ...patch };
+      return { ...prev, earnings };
+    });
+  };
+
+  const handleAddEarning = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newEarningName.trim()) return;
+    const cleanId = newEarningName
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, "_")
+      .slice(0, 16) + "_" + Math.floor(100 + Math.random() * 900);
+
+    const newComp: SalaryEarningComponent = {
+      id: cleanId,
+      name: newEarningName.trim(),
+      type: newEarningType,
+      value: Number(newEarningValue) || 0,
+      isDefault: false,
+    };
+
+    setSalaryComponentsConfig((prev) => ({
+      ...prev,
+      earnings: [...prev.earnings, newComp],
+    }));
+    setNewEarningName("");
+    setNewEarningValue(5);
+  };
+
+  const handleDeleteEarning = (index: number) => {
+    setSalaryComponentsConfig((prev) => ({
+      ...prev,
+      earnings: prev.earnings.filter((_, i) => i !== index),
+    }));
+  };
+
+  const handleUpdateDeduction = (index: number, patch: Partial<SalaryDeductionComponent>) => {
+    setSalaryComponentsConfig((prev) => {
+      const deductions = [...prev.deductions];
+      deductions[index] = { ...deductions[index], ...patch };
+      return { ...prev, deductions };
+    });
+  };
+
+  const handleAddDeduction = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newDeductionName.trim()) return;
+    const cleanId = newDeductionName
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, "_")
+      .slice(0, 16) + "_" + Math.floor(100 + Math.random() * 900);
+
+    const newComp: SalaryDeductionComponent = {
+      id: cleanId,
+      name: newDeductionName.trim(),
+      type: newDeductionType,
+      value: Number(newDeductionValue) || 0,
+      threshold: Number(newDeductionThreshold) || undefined,
+      isDefault: false,
+    };
+
+    setSalaryComponentsConfig((prev) => ({
+      ...prev,
+      deductions: [...prev.deductions, newComp],
+    }));
+    setNewDeductionName("");
+    setNewDeductionValue(200);
+  };
+
+  const handleDeleteDeduction = (index: number) => {
+    setSalaryComponentsConfig((prev) => ({
+      ...prev,
+      deductions: prev.deductions.filter((_, i) => i !== index),
+    }));
   };
 
   // Handle Save Salary & Deduction Components
@@ -334,19 +487,14 @@ export default function SettingsModal({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          defaultBasicPercent,
-          defaultHraPercent,
-          defaultSpecialPercent,
-          defaultPfPercent,
-          defaultPtAmount,
-          defaultOtMultiplier,
+          salaryComponentsConfig,
         }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to save salary components.");
       setSalaryMessage({
         type: "success",
-        text: "Earning & deduction components saved successfully! Applied to payslip generator.",
+        text: "Earning & deduction components saved successfully! Applied across all employee payslips.",
       });
     } catch (err: any) {
       setSalaryMessage({ type: "error", text: err.message || "Failed to save settings." });
@@ -792,149 +940,191 @@ export default function SettingsModal({
                 <Palmtree className="w-3.5 h-3.5 text-blue-700" /> Leave Types &amp; Number of Leaves Setting
               </span>
               <p className="text-[11px] text-blue-800">
-                Configure annual leave quotas for staff. Any leave type set to <span className="font-bold">0 days</span> is automatically hidden and excluded from employee leave summary cards.
+                Rename leave types, configure annual quotas, or add new custom leave types. Any leave type set to <span className="font-bold">0 days</span> is automatically hidden and excluded from employee leave summary cards.
               </p>
             </div>
 
-            {/* Earned Leave */}
-            <div className="bg-blue-50/50 border border-blue-200 rounded-xl p-4 space-y-3">
+            <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-2">
-                  <Palmtree className="w-4 h-4 text-blue-700" />
-                  <span className="font-bold text-blue-950 text-xs uppercase tracking-wider">
-                    Earned Leave (EL) &bull; Standard Paid Leave
-                  </span>
-                </div>
-                <span className="bg-blue-200 text-blue-900 text-[10px] font-extrabold px-2 py-0.5 rounded-full">
-                  Primary
+                <span className="font-extrabold text-slate-800 uppercase tracking-wider text-[11px]">
+                  Configured Leave Types ({leaveTypesConfigList.length})
+                </span>
+                <span className="text-[10px] text-slate-500">
+                  Edit names, quotas, or accrual rates below
                 </span>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {leaveTypesConfigList.map((type, idx) => (
+                <div
+                  key={type.id || idx}
+                  className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl space-y-2.5"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 flex-1">
+                      <input
+                        type="text"
+                        required
+                        value={type.name}
+                        onChange={(e) => handleUpdateLeaveTypeField(idx, { name: e.target.value })}
+                        className="px-2.5 py-1.5 border border-slate-300 rounded-lg font-bold text-slate-900 bg-white text-xs w-full max-w-xs focus:ring-2 focus:ring-blue-500 outline-none"
+                        placeholder="Leave Type Name"
+                      />
+                      <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full ${
+                        type.isPaid ? "bg-emerald-100 text-emerald-800" : "bg-slate-200 text-slate-700"
+                      }`}>
+                        {type.isPaid ? "Paid Leave" : "Unpaid / LWP"}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <label className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-600 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={type.isPaid}
+                          onChange={(e) => handleUpdateLeaveTypeField(idx, { isPaid: e.target.checked })}
+                          className="rounded text-blue-600"
+                        />
+                        <span>Paid</span>
+                      </label>
+
+                      {!type.isDefault && (
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteCustomLeaveType(idx)}
+                          className="text-slate-400 hover:text-rose-600 p-1 rounded transition cursor-pointer"
+                          title="Delete custom leave type"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3 text-xs pt-1 border-t border-slate-200/80">
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-600 mb-0.5">
+                        Annual Quota Days {type.annualDays === 0 && <span className="text-amber-600">(0d = Hidden)</span>}
+                      </label>
+                      <input
+                        type="number"
+                        min={0}
+                        max={365}
+                        step={0.5}
+                        value={type.annualDays}
+                        onChange={(e) =>
+                          handleUpdateLeaveTypeField(idx, {
+                            annualDays: parseFloat(e.target.value) || 0,
+                          })
+                        }
+                        className="w-full px-2.5 py-1 border border-slate-300 rounded-lg font-bold text-slate-900 bg-white"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-600 mb-0.5">
+                        Monthly Accrual (Days / Month)
+                      </label>
+                      <input
+                        type="number"
+                        min={0}
+                        max={30}
+                        step={0.1}
+                        value={type.accrualRate || 0}
+                        onChange={(e) =>
+                          handleUpdateLeaveTypeField(idx, {
+                            accrualRate: parseFloat(e.target.value) || 0,
+                          })
+                        }
+                        className="w-full px-2.5 py-1 border border-slate-300 rounded-lg font-bold text-slate-900 bg-white"
+                      />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Add Custom Leave Type Box */}
+            <div className="bg-blue-50/70 border border-blue-200 rounded-xl p-3.5 space-y-3">
+              <span className="font-extrabold text-blue-950 text-xs flex items-center gap-1.5 uppercase tracking-wider">
+                <Plus className="w-4 h-4 text-blue-700" /> + Add Custom Leave Type
+              </span>
+
+              <div className="grid grid-cols-1 sm:grid-cols-4 gap-2.5 items-end">
+                <div className="sm:col-span-2">
+                  <label className="block text-[10px] font-bold text-slate-700 mb-0.5">
+                    New Leave Type Name
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Maternity Leave, Comp-Off..."
+                    value={newTypeName}
+                    onChange={(e) => setNewTypeName(e.target.value)}
+                    className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg text-xs font-semibold bg-white"
+                  />
+                </div>
+
                 <div>
-                  <label className="block text-[11px] font-bold text-slate-700 mb-1">
-                    Annual Quota Days <span className="text-rose-500">*</span>
+                  <label className="block text-[10px] font-bold text-slate-700 mb-0.5">
+                    Annual Days
                   </label>
                   <input
                     type="number"
                     min={0}
                     max={365}
                     step={0.5}
-                    required
-                    value={earnedDays}
-                    onChange={(e) => {
-                      const val = parseFloat(e.target.value) || 0;
-                      setEarnedDays(val);
-                      setEarnedLeaveAccrual(parseFloat((val / 12).toFixed(2)));
-                    }}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg font-bold text-slate-900 bg-white"
+                    value={newTypeDays}
+                    onChange={(e) => setNewTypeDays(parseFloat(e.target.value) || 0)}
+                    className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg text-xs font-bold bg-white"
                   />
-                  <span className="text-[10px] text-slate-500 mt-0.5 block">Standard: 18 days/year</span>
                 </div>
 
                 <div>
-                  <label className="block text-[11px] font-bold text-slate-700 mb-1">
-                    Monthly Accrual (Days / Month)
-                  </label>
+                  <button
+                    type="button"
+                    onClick={handleAddCustomLeaveType}
+                    disabled={!newTypeName.trim()}
+                    className="w-full py-1.5 px-3 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-lg font-bold text-xs transition cursor-pointer flex items-center justify-center gap-1"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Add Type</span>
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-4 text-[11px] text-slate-600">
+                <label className="flex items-center gap-1.5 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={newTypeIsPaid}
+                    onChange={(e) => setNewTypeIsPaid(e.target.checked)}
+                    className="rounded text-blue-600"
+                  />
+                  <span>Is Paid Leave</span>
+                </label>
+
+                <div className="flex items-center gap-1.5">
+                  <span>Accrual (Days/Mo):</span>
                   <input
                     type="number"
                     min={0}
                     max={30}
                     step={0.1}
-                    required
-                    value={earnedLeaveAccrual}
-                    onChange={(e) => setEarnedLeaveAccrual(parseFloat(e.target.value) || 0)}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg font-bold text-slate-900 bg-white"
+                    value={newTypeAccrual}
+                    onChange={(e) => setNewTypeAccrual(parseFloat(e.target.value) || 0)}
+                    className="w-16 px-1.5 py-0.5 border border-slate-300 rounded text-xs bg-white text-center font-bold"
                   />
-                  <span className="text-[10px] text-slate-500 mt-0.5 block">Standard: 1.5 days accrued / month</span>
                 </div>
               </div>
-            </div>
-
-            {/* Casual Leave */}
-            <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-2">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-2">
-                  <Coffee className="w-4 h-4 text-amber-700" />
-                  <span className="font-bold text-slate-800 text-xs uppercase tracking-wider">
-                    Casual Leave (CL)
-                  </span>
-                </div>
-                <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full ${casualDays > 0 ? "bg-amber-100 text-amber-800" : "bg-slate-200 text-slate-600"}`}>
-                  {casualDays > 0 ? `${casualDays}d Configured` : "Removed / Disabled (0d)"}
-                </span>
-              </div>
-              <div className="flex items-center gap-3">
-                <input
-                  type="number"
-                  min={0}
-                  max={60}
-                  step={0.5}
-                  value={casualDays}
-                  onChange={(e) => setCasualDays(parseFloat(e.target.value) || 0)}
-                  className="w-28 px-3 py-1.5 border border-slate-300 rounded-lg font-bold text-slate-900 bg-white"
-                />
-                <p className="text-[11px] text-slate-500">
-                  Leave as <span className="font-bold text-slate-700">0</span> if Casual Leave is not offered. It will not show on employee cards.
-                </p>
-              </div>
-            </div>
-
-            {/* Sick Leave */}
-            <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-2">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-2">
-                  <HeartPulse className="w-4 h-4 text-rose-700" />
-                  <span className="font-bold text-slate-800 text-xs uppercase tracking-wider">
-                    Sick Leave (SL)
-                  </span>
-                </div>
-                <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full ${sickDays > 0 ? "bg-rose-100 text-rose-800" : "bg-slate-200 text-slate-600"}`}>
-                  {sickDays > 0 ? `${sickDays}d Configured` : "Removed / Disabled (0d)"}
-                </span>
-              </div>
-              <div className="flex items-center gap-3">
-                <input
-                  type="number"
-                  min={0}
-                  max={60}
-                  step={0.5}
-                  value={sickDays}
-                  onChange={(e) => setSickDays(parseFloat(e.target.value) || 0)}
-                  className="w-28 px-3 py-1.5 border border-slate-300 rounded-lg font-bold text-slate-900 bg-white"
-                />
-                <p className="text-[11px] text-slate-500">
-                  Leave as <span className="font-bold text-slate-700">0</span> if Sick Leave is not offered. It will not show on employee cards.
-                </p>
-              </div>
-            </div>
-
-            {/* Unpaid / LWP Toggle */}
-            <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 flex items-center justify-between">
-              <div>
-                <span className="font-bold text-slate-800 block text-xs">
-                  Unpaid Leave / Leave Without Pay (LWP) Card
-                </span>
-                <p className="text-[11px] text-slate-500 mt-0.5">
-                  Show LWP card in leave balance summary widget
-                </p>
-              </div>
-              <label className="relative inline-flex items-center cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={unpaidEnabled}
-                  onChange={(e) => setUnpaidEnabled(e.target.checked)}
-                  className="sr-only peer"
-                />
-                <div className="w-9 h-5 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
-              </label>
             </div>
 
             {/* Total Summary Pill */}
             <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center justify-between text-xs">
               <span className="font-bold text-emerald-900">Total Configured Annual Paid Leave Quota:</span>
               <span className="font-extrabold text-emerald-800 text-sm bg-white px-2.5 py-0.5 rounded-lg border border-emerald-300">
-                {earnedDays + casualDays + sickDays} Days / Year
+                {leaveTypesConfigList
+                  .filter((t) => t.isPaid)
+                  .reduce((sum, t) => sum + (parseFloat(String(t.annualDays)) || 0), 0)}{" "}
+                Days / Year
               </span>
             </div>
 
@@ -943,14 +1133,14 @@ export default function SettingsModal({
               <button
                 type="button"
                 onClick={onClose}
-                className="px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-100 rounded-lg transition"
+                className="px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-100 rounded-lg transition cursor-pointer"
               >
                 Cancel
               </button>
               <button
                 type="submit"
                 disabled={leaveLoading}
-                className="px-5 py-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition shadow-xs disabled:opacity-50 flex items-center gap-1.5"
+                className="px-5 py-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition shadow-xs disabled:opacity-50 flex items-center gap-1.5 cursor-pointer"
               >
                 <CheckCircle2 className="w-3.5 h-3.5" />
                 <span>{leaveLoading ? "Saving..." : "Save Leave Quotas"}</span>
@@ -984,153 +1174,319 @@ export default function SettingsModal({
                 <Coins className="w-3.5 h-3.5 text-emerald-700" /> Set Earning &amp; Deduction Components
               </span>
               <p className="text-[11px] text-emerald-800">
-                Configure company-wide standard component proportions for salary slip generation. When creating payslips, these percentages divide employee monthly CTC into basic pay, allowances, and statutory deductions.
+                Rename existing components or add new custom earnings &amp; deductions. When generating payslips, these components will be dynamically calculated and displayed.
               </p>
             </div>
 
-            {/* Earnings Breakdown */}
+            {/* 1. Earnings Components */}
             <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-3">
               <div className="flex items-center justify-between border-b border-slate-200 pb-2">
                 <span className="font-extrabold text-slate-800 text-xs uppercase tracking-wider">
-                  1. Earnings Components (% of CTC)
+                  1. Earning Components ({salaryComponentsConfig.earnings.length})
                 </span>
-                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                  defaultBasicPercent + defaultHraPercent + defaultSpecialPercent === 100
-                    ? "bg-emerald-100 text-emerald-800"
-                    : "bg-amber-100 text-amber-800"
-                }`}>
-                  Total: {defaultBasicPercent + defaultHraPercent + defaultSpecialPercent}% CTC
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
+                  Total:{" "}
+                  {salaryComponentsConfig.earnings
+                    .filter((e) => e.type === "PERCENT_CTC")
+                    .reduce((sum, e) => sum + (Number(e.value) || 0), 0)}
+                  % CTC
                 </span>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-700 mb-1">
-                    Basic Salary (% CTC)
-                  </label>
-                  <div className="flex items-center gap-1.5">
-                    <input
-                      type="number"
-                      min={10}
-                      max={100}
-                      step={1}
-                      required
-                      value={defaultBasicPercent}
-                      onChange={(e) => setDefaultBasicPercent(parseFloat(e.target.value) || 0)}
-                      className="w-full px-3 py-1.5 border border-slate-300 rounded-lg font-bold text-slate-900 bg-white"
-                    />
-                    <span className="text-xs font-bold text-slate-600">%</span>
-                  </div>
-                  <span className="text-[10px] text-slate-500 mt-0.5 block">Standard: 50%</span>
-                </div>
+              <div className="space-y-2.5">
+                {salaryComponentsConfig.earnings.map((earning, idx) => (
+                  <div
+                    key={earning.id || idx}
+                    className="p-2.5 bg-white border border-slate-200 rounded-lg flex items-center justify-between gap-3 shadow-2xs"
+                  >
+                    <div className="flex-1">
+                      <input
+                        type="text"
+                        required
+                        value={earning.name}
+                        onChange={(e) => handleUpdateEarning(idx, { name: e.target.value })}
+                        className="w-full px-2 py-1 font-bold text-slate-900 border border-slate-300 rounded text-xs bg-white"
+                        placeholder="Component Name"
+                      />
+                    </div>
 
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-700 mb-1">
-                    HRA (% CTC)
-                  </label>
-                  <div className="flex items-center gap-1.5">
-                    <input
-                      type="number"
-                      min={0}
-                      max={100}
-                      step={1}
-                      required
-                      value={defaultHraPercent}
-                      onChange={(e) => setDefaultHraPercent(parseFloat(e.target.value) || 0)}
-                      className="w-full px-3 py-1.5 border border-slate-300 rounded-lg font-bold text-slate-900 bg-white"
-                    />
-                    <span className="text-xs font-bold text-slate-600">%</span>
-                  </div>
-                  <span className="text-[10px] text-slate-500 mt-0.5 block">Standard: 30%</span>
-                </div>
+                    <div className="w-28">
+                      <select
+                        value={earning.type}
+                        onChange={(e) =>
+                          handleUpdateEarning(idx, {
+                            type: e.target.value as "PERCENT_CTC" | "FIXED",
+                          })
+                        }
+                        className="w-full px-2 py-1 border border-slate-300 rounded text-xs bg-white font-medium"
+                      >
+                        <option value="PERCENT_CTC">% of CTC</option>
+                        <option value="FIXED">Fixed (₹)</option>
+                      </select>
+                    </div>
 
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-700 mb-1">
-                    Special / Conveyance (% CTC)
-                  </label>
-                  <div className="flex items-center gap-1.5">
-                    <input
-                      type="number"
-                      min={0}
-                      max={100}
-                      step={1}
-                      required
-                      value={defaultSpecialPercent}
-                      onChange={(e) => setDefaultSpecialPercent(parseFloat(e.target.value) || 0)}
-                      className="w-full px-3 py-1.5 border border-slate-300 rounded-lg font-bold text-slate-900 bg-white"
-                    />
-                    <span className="text-xs font-bold text-slate-600">%</span>
+                    <div className="w-24 flex items-center gap-1">
+                      <input
+                        type="number"
+                        min={0}
+                        step={earning.type === "PERCENT_CTC" ? 1 : 50}
+                        value={earning.value}
+                        onChange={(e) =>
+                          handleUpdateEarning(idx, {
+                            value: parseFloat(e.target.value) || 0,
+                          })
+                        }
+                        className="w-full px-2 py-1 border border-slate-300 rounded text-xs bg-white font-bold text-right"
+                      />
+                      <span className="text-xs font-semibold text-slate-600">
+                        {earning.type === "PERCENT_CTC" ? "%" : "₹"}
+                      </span>
+                    </div>
+
+                    {!earning.isDefault && (
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteEarning(idx)}
+                        className="text-slate-400 hover:text-rose-600 p-1 rounded transition cursor-pointer"
+                        title="Delete component"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    )}
                   </div>
-                  <span className="text-[10px] text-slate-500 mt-0.5 block">Standard: 20%</span>
+                ))}
+              </div>
+
+              {/* Add Custom Earning Component */}
+              <div className="bg-emerald-50/60 border border-emerald-200 rounded-lg p-3 space-y-2">
+                <span className="font-bold text-emerald-950 text-xs flex items-center gap-1">
+                  <Plus className="w-3.5 h-3.5 text-emerald-700" /> Add Custom Earning Component
+                </span>
+                <div className="grid grid-cols-1 sm:grid-cols-4 gap-2 items-end">
+                  <div className="sm:col-span-2">
+                    <label className="block text-[10px] font-bold text-slate-600 mb-0.5">
+                      Component Name
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Medical Allowance, Conveyance..."
+                      value={newEarningName}
+                      onChange={(e) => setNewEarningName(e.target.value)}
+                      className="w-full px-2 py-1 border border-slate-300 rounded text-xs bg-white"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-600 mb-0.5">
+                      Type
+                    </label>
+                    <select
+                      value={newEarningType}
+                      onChange={(e) =>
+                        setNewEarningType(e.target.value as "PERCENT_CTC" | "FIXED")
+                      }
+                      className="w-full px-2 py-1 border border-slate-300 rounded text-xs bg-white"
+                    >
+                      <option value="PERCENT_CTC">% of CTC</option>
+                      <option value="FIXED">Fixed (₹)</option>
+                    </select>
+                  </div>
+
+                  <div className="flex items-center gap-1.5">
+                    <div className="flex-1">
+                      <label className="block text-[10px] font-bold text-slate-600 mb-0.5">
+                        Value
+                      </label>
+                      <input
+                        type="number"
+                        min={0}
+                        value={newEarningValue}
+                        onChange={(e) => setNewEarningValue(parseFloat(e.target.value) || 0)}
+                        className="w-full px-2 py-1 border border-slate-300 rounded text-xs bg-white font-bold"
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleAddEarning}
+                      disabled={!newEarningName.trim()}
+                      className="mt-4 px-3 py-1 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded text-xs font-bold transition cursor-pointer"
+                    >
+                      Add
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
 
-            {/* Overtime & Statutory Deductions */}
+            {/* 2. Deductions Components & Overtime */}
             <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-3">
-              <span className="font-extrabold text-slate-800 text-xs uppercase tracking-wider block border-b border-slate-200 pb-2">
-                2. Overtime &amp; Deduction Components
-              </span>
-
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-700 mb-1">
-                    Overtime Hourly Multiplier
-                  </label>
-                  <div className="flex items-center gap-1.5">
-                    <input
-                      type="number"
-                      min={1}
-                      max={3}
-                      step={0.1}
-                      required
-                      value={defaultOtMultiplier}
-                      onChange={(e) => setDefaultOtMultiplier(parseFloat(e.target.value) || 1)}
-                      className="w-full px-3 py-1.5 border border-slate-300 rounded-lg font-bold text-slate-900 bg-white"
-                    />
-                    <span className="text-xs font-bold text-slate-600">&times;</span>
-                  </div>
-                  <span className="text-[10px] text-slate-500 mt-0.5 block">Standard: 1.5&times; rate</span>
+              <div className="flex items-center justify-between border-b border-slate-200 pb-2">
+                <span className="font-extrabold text-slate-800 text-xs uppercase tracking-wider">
+                  2. Deduction Components ({salaryComponentsConfig.deductions.length})
+                </span>
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] font-semibold text-slate-600">OT Multiplier:</span>
+                  <input
+                    type="number"
+                    min={1}
+                    max={3}
+                    step={0.1}
+                    value={salaryComponentsConfig.otMultiplier}
+                    onChange={(e) =>
+                      setSalaryComponentsConfig((prev) => ({
+                        ...prev,
+                        otMultiplier: parseFloat(e.target.value) || 1,
+                      }))
+                    }
+                    className="w-16 px-1.5 py-0.5 border border-slate-300 rounded font-bold text-center bg-white"
+                  />
+                  <span className="text-xs font-bold text-slate-600">&times;</span>
                 </div>
+              </div>
 
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-700 mb-1">
-                    Provident Fund (PF) (% Basic)
-                  </label>
-                  <div className="flex items-center gap-1.5">
+              <div className="space-y-2.5">
+                {salaryComponentsConfig.deductions.map((deduction, idx) => (
+                  <div
+                    key={deduction.id || idx}
+                    className="p-2.5 bg-white border border-slate-200 rounded-lg flex items-center justify-between gap-3 shadow-2xs"
+                  >
+                    <div className="flex-1">
+                      <input
+                        type="text"
+                        required
+                        value={deduction.name}
+                        onChange={(e) => handleUpdateDeduction(idx, { name: e.target.value })}
+                        className="w-full px-2 py-1 font-bold text-slate-900 border border-slate-300 rounded text-xs bg-white"
+                        placeholder="Component Name"
+                      />
+                    </div>
+
+                    <div className="w-32">
+                      <select
+                        value={deduction.type}
+                        onChange={(e) =>
+                          handleUpdateDeduction(idx, {
+                            type: e.target.value as "PERCENT_BASIC" | "PERCENT_CTC" | "FIXED",
+                          })
+                        }
+                        className="w-full px-2 py-1 border border-slate-300 rounded text-xs bg-white font-medium"
+                      >
+                        <option value="PERCENT_BASIC">% of Basic</option>
+                        <option value="PERCENT_CTC">% of CTC</option>
+                        <option value="FIXED">Fixed (₹)</option>
+                      </select>
+                    </div>
+
+                    <div className="w-24 flex items-center gap-1">
+                      <input
+                        type="number"
+                        min={0}
+                        step={deduction.type === "FIXED" ? 50 : 0.5}
+                        value={deduction.value}
+                        onChange={(e) =>
+                          handleUpdateDeduction(idx, {
+                            value: parseFloat(e.target.value) || 0,
+                          })
+                        }
+                        className="w-full px-2 py-1 border border-slate-300 rounded text-xs bg-white font-bold text-right"
+                      />
+                      <span className="text-xs font-semibold text-slate-600">
+                        {deduction.type === "FIXED" ? "₹" : "%"}
+                      </span>
+                    </div>
+
+                    <div className="w-28 flex items-center gap-1">
+                      <span className="text-[10px] text-slate-500">Min:</span>
+                      <input
+                        type="number"
+                        min={0}
+                        step={1000}
+                        placeholder="Thresh"
+                        value={deduction.threshold || ""}
+                        onChange={(e) =>
+                          handleUpdateDeduction(idx, {
+                            threshold: e.target.value === "" ? undefined : parseFloat(e.target.value) || 0,
+                          })
+                        }
+                        className="w-full px-1.5 py-1 border border-slate-300 rounded text-xs bg-white text-right"
+                      />
+                    </div>
+
+                    {!deduction.isDefault && (
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteDeduction(idx)}
+                        className="text-slate-400 hover:text-rose-600 p-1 rounded transition cursor-pointer"
+                        title="Delete component"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              {/* Add Custom Deduction Component */}
+              <div className="bg-rose-50/60 border border-rose-200 rounded-lg p-3 space-y-2">
+                <span className="font-bold text-rose-950 text-xs flex items-center gap-1">
+                  <Plus className="w-3.5 h-3.5 text-rose-700" /> Add Custom Deduction Component
+                </span>
+                <div className="grid grid-cols-1 sm:grid-cols-5 gap-2 items-end">
+                  <div className="sm:col-span-2">
+                    <label className="block text-[10px] font-bold text-slate-600 mb-0.5">
+                      Component Name
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Health Insurance, TDS..."
+                      value={newDeductionName}
+                      onChange={(e) => setNewDeductionName(e.target.value)}
+                      className="w-full px-2 py-1 border border-slate-300 rounded text-xs bg-white"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-600 mb-0.5">
+                      Type
+                    </label>
+                    <select
+                      value={newDeductionType}
+                      onChange={(e) =>
+                        setNewDeductionType(
+                          e.target.value as "PERCENT_BASIC" | "PERCENT_CTC" | "FIXED"
+                        )
+                      }
+                      className="w-full px-2 py-1 border border-slate-300 rounded text-xs bg-white"
+                    >
+                      <option value="PERCENT_BASIC">% of Basic</option>
+                      <option value="PERCENT_CTC">% of CTC</option>
+                      <option value="FIXED">Fixed (₹)</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-600 mb-0.5">
+                      Value
+                    </label>
                     <input
                       type="number"
                       min={0}
-                      max={20}
-                      step={0.5}
-                      required
-                      value={defaultPfPercent}
-                      onChange={(e) => setDefaultPfPercent(parseFloat(e.target.value) || 0)}
-                      className="w-full px-3 py-1.5 border border-slate-300 rounded-lg font-bold text-slate-900 bg-white"
+                      value={newDeductionValue}
+                      onChange={(e) => setNewDeductionValue(parseFloat(e.target.value) || 0)}
+                      className="w-full px-2 py-1 border border-slate-300 rounded text-xs bg-white font-bold"
                     />
-                    <span className="text-xs font-bold text-slate-600">%</span>
                   </div>
-                  <span className="text-[10px] text-slate-500 mt-0.5 block">Standard: 12% on Basic</span>
-                </div>
 
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-700 mb-1">
-                    Professional Tax (PT)
-                  </label>
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-xs font-bold text-slate-600">₹</span>
-                    <input
-                      type="number"
-                      min={0}
-                      max={1000}
-                      step={10}
-                      required
-                      value={defaultPtAmount}
-                      onChange={(e) => setDefaultPtAmount(parseFloat(e.target.value) || 0)}
-                      className="w-full px-3 py-1.5 border border-slate-300 rounded-lg font-bold text-slate-900 bg-white"
-                    />
+                  <div>
+                    <button
+                      type="button"
+                      onClick={handleAddDeduction}
+                      disabled={!newDeductionName.trim()}
+                      className="w-full py-1 px-3 bg-rose-600 hover:bg-rose-700 disabled:opacity-50 text-white rounded text-xs font-bold transition cursor-pointer"
+                    >
+                      Add
+                    </button>
                   </div>
-                  <span className="text-[10px] text-slate-500 mt-0.5 block">Standard: ₹200 / month</span>
                 </div>
               </div>
             </div>
@@ -1140,14 +1496,14 @@ export default function SettingsModal({
               <button
                 type="button"
                 onClick={onClose}
-                className="px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-100 rounded-lg transition"
+                className="px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-100 rounded-lg transition cursor-pointer"
               >
                 Cancel
               </button>
               <button
                 type="submit"
                 disabled={salaryLoading}
-                className="px-5 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg transition shadow-xs disabled:opacity-50 flex items-center gap-1.5"
+                className="px-5 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg transition shadow-xs disabled:opacity-50 flex items-center gap-1.5 cursor-pointer"
               >
                 <CheckCircle2 className="w-3.5 h-3.5" />
                 <span>{salaryLoading ? "Saving..." : "Save Salary Components"}</span>

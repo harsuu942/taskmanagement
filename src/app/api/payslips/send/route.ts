@@ -157,30 +157,43 @@ function generatePayslipEmailHtml(data: any, employeeName: string, monthYear: st
               </tr>
             </thead>
             <tbody>
-              <tr>
-                <td>Basic Salary</td>
-                <td style="text-align: right; font-weight: 700;">${formatCurrency(data.basicSalary)}</td>
-                <td>Loss of Pay (LWP / Unpaid)</td>
-                <td style="text-align: right; font-weight: 700; color: #dc2626;">${formatCurrency(data.unpaidDeduction)}</td>
-              </tr>
-              <tr>
-                <td>House Rent Allowance (HRA)</td>
-                <td style="text-align: right; font-weight: 700;">${formatCurrency(data.hra)}</td>
-                <td>Provident Fund (PF)</td>
-                <td style="text-align: right; font-weight: 700; color: #dc2626;">${formatCurrency(data.pfDeduction)}</td>
-              </tr>
-              <tr>
-                <td>Special &amp; Other Allowances</td>
-                <td style="text-align: right; font-weight: 700;">${formatCurrency(data.specialAllowance)}</td>
-                <td>Professional Tax / TDS</td>
-                <td style="text-align: right; font-weight: 700; color: #dc2626;">${formatCurrency(data.ptDeduction)}</td>
-              </tr>
-              <tr>
-                <td>Overtime Pay (${data.overtimeHours || 0} hrs)</td>
-                <td style="text-align: right; font-weight: 700; color: #d97706;">${formatCurrency(data.overtimePay)}</td>
-                <td>Other Deductions</td>
-                <td style="text-align: right; font-weight: 700; color: #dc2626;">${formatCurrency(data.otherDeductions || 0)}</td>
-              </tr>
+              ${
+                data.pairedRows && Array.isArray(data.pairedRows) && data.pairedRows.length > 0
+                  ? data.pairedRows.map((row: any) => `
+                    <tr>
+                      <td>${row.earning ? row.earning.name : "—"}</td>
+                      <td style="text-align: right; font-weight: 700; color: #0f172a;">${row.earning ? formatCurrency(row.earning.amount) : "—"}</td>
+                      <td>${row.deduction ? row.deduction.name : "—"}</td>
+                      <td style="text-align: right; font-weight: 700; color: #dc2626;">${row.deduction ? formatCurrency(row.deduction.amount) : "—"}</td>
+                    </tr>
+                  `).join("")
+                  : `
+                    <tr>
+                      <td>Basic Salary</td>
+                      <td style="text-align: right; font-weight: 700;">${formatCurrency(data.basicSalary)}</td>
+                      <td>Loss of Pay (LWP / Unpaid)</td>
+                      <td style="text-align: right; font-weight: 700; color: #dc2626;">${formatCurrency(data.unpaidDeduction)}</td>
+                    </tr>
+                    <tr>
+                      <td>House Rent Allowance (HRA)</td>
+                      <td style="text-align: right; font-weight: 700;">${formatCurrency(data.hra)}</td>
+                      <td>Provident Fund (PF)</td>
+                      <td style="text-align: right; font-weight: 700; color: #dc2626;">${formatCurrency(data.pfDeduction)}</td>
+                    </tr>
+                    <tr>
+                      <td>Special &amp; Other Allowances</td>
+                      <td style="text-align: right; font-weight: 700;">${formatCurrency(data.specialAllowance)}</td>
+                      <td>Professional Tax / TDS</td>
+                      <td style="text-align: right; font-weight: 700; color: #dc2626;">${formatCurrency(data.ptDeduction)}</td>
+                    </tr>
+                    <tr>
+                      <td>Overtime Pay (${data.overtimeHours || 0} hrs)</td>
+                      <td style="text-align: right; font-weight: 700; color: #d97706;">${formatCurrency(data.overtimePay)}</td>
+                      <td>Other Deductions</td>
+                      <td style="text-align: right; font-weight: 700; color: #dc2626;">${formatCurrency(data.otherDeductions || 0)}</td>
+                    </tr>
+                  `
+              }
               <tr style="background: #f8fafc; font-weight: 800; border-top: 2px solid #cbd5e1;">
                 <td>Gross Total Earnings</td>
                 <td style="text-align: right; color: #16a34a; font-size: 13px;">${formatCurrency(data.grossEarnings)}</td>

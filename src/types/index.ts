@@ -206,8 +206,40 @@ export interface EmployeeDailyReportData {
   totalTasksPending: number;
 }
 
-export type LeaveType = "CASUAL" | "SICK" | "EARNED" | "UNPAID" | "HALF_DAY" | "HOURLY";
+export type LeaveType = string;
 export type LeaveStatus = "PENDING" | "APPROVED" | "REJECTED";
+
+export interface SalaryEarningComponent {
+  id: string;
+  name: string;
+  type: "PERCENT_CTC" | "FIXED";
+  value: number;
+  isDefault?: boolean;
+}
+
+export interface SalaryDeductionComponent {
+  id: string;
+  name: string;
+  type: "PERCENT_BASIC" | "PERCENT_CTC" | "FIXED";
+  value: number;
+  threshold?: number;
+  isDefault?: boolean;
+}
+
+export interface SalaryComponentsConfig {
+  earnings: SalaryEarningComponent[];
+  deductions: SalaryDeductionComponent[];
+  otMultiplier: number;
+}
+
+export interface CustomLeaveTypeConfig {
+  id: string;
+  name: string;
+  annualDays: number;
+  accrualRate?: number;
+  isPaid: boolean;
+  isDefault?: boolean;
+}
 
 export interface LeaveRequest {
   id: string;

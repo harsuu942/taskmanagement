@@ -1,7 +1,12 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { User } from "@/types";
+import {
+  User,
+  SalaryComponentsConfig,
+  SalaryEarningComponent,
+  SalaryDeductionComponent,
+} from "@/types";
 import {
   Users,
   UserPlus,
@@ -27,6 +32,8 @@ import {
   Calendar,
   MapPin,
   Coins,
+  Plus,
+  Trash2,
 } from "lucide-react";
 import SalarySlipModal from "./SalarySlipModal";
 
@@ -43,14 +50,27 @@ export default function EmployeeManagement({
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
 
-  // Salary Components Modal State (Admin: Default Earning & Deduction Components)
+  // Salary Components Modal State (Admin: Dynamic Earning & Deduction Components)
   const [showSalaryComponentsModal, setShowSalaryComponentsModal] = useState(false);
-  const [compBasicPercent, setCompBasicPercent] = useState<number>(50);
-  const [compHraPercent, setCompHraPercent] = useState<number>(30);
-  const [compSpecialPercent, setCompSpecialPercent] = useState<number>(20);
-  const [compPfPercent, setCompPfPercent] = useState<number>(12);
-  const [compPtAmount, setCompPtAmount] = useState<number>(200);
-  const [compOtMultiplier, setCompOtMultiplier] = useState<number>(1.5);
+  const [salaryComponentsConfig, setSalaryComponentsConfig] = useState<SalaryComponentsConfig>({
+    earnings: [
+      { id: "basic", name: "Basic Salary", type: "PERCENT_CTC", value: 50, isDefault: true },
+      { id: "hra", name: "House Rent Allowance (HRA)", type: "PERCENT_CTC", value: 30, isDefault: true },
+      { id: "special", name: "Special Allowance", type: "PERCENT_CTC", value: 20, isDefault: true },
+    ],
+    deductions: [
+      { id: "pf", name: "Provident Fund (PF)", type: "PERCENT_BASIC", value: 12, threshold: 15000, isDefault: true },
+      { id: "pt", name: "Professional Tax (PT)", type: "FIXED", value: 200, threshold: 15000, isDefault: true },
+    ],
+    otMultiplier: 1.5,
+  });
+  const [newEarningName, setNewEarningName] = useState("");
+  const [newEarningType, setNewEarningType] = useState<"PERCENT_CTC" | "FIXED">("PERCENT_CTC");
+  const [newEarningValue, setNewEarningValue] = useState<number>(5);
+  const [newDeductionName, setNewDeductionName] = useState("");
+  const [newDeductionType, setNewDeductionType] = useState<"PERCENT_BASIC" | "PERCENT_CTC" | "FIXED">("FIXED");
+  const [newDeductionValue, setNewDeductionValue] = useState<number>(200);
+  const [newDeductionThreshold, setNewDeductionThreshold] = useState<number>(15000);
   const [compLoading, setCompLoading] = useState(false);
   const [compMessage, setCompMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
@@ -60,17 +80,108 @@ export default function EmployeeManagement({
       const res = await fetch("/api/settings");
       const data = await res.json();
       if (data.settings) {
-        if (data.settings.defaultBasicPercent !== undefined) setCompBasicPercent(data.settings.defaultBasicPercent);
-        if (data.settings.defaultHraPercent !== undefined) setCompHraPercent(data.settings.defaultHraPercent);
-        if (data.settings.defaultSpecialPercent !== undefined) setCompSpecialPercent(data.settings.defaultSpecialPercent);
-        if (data.settings.defaultPfPercent !== undefined) setCompPfPercent(data.settings.defaultPfPercent);
-        if (data.settings.defaultPtAmount !== undefined) setCompPtAmount(data.settings.defaultPtAmount);
-        if (data.settings.defaultOtMultiplier !== undefined) setCompOtMultiplier(data.settings.defaultOtMultiplier);
+        if (data.settings.salaryComponentsConfig) {
+          setSalaryComponentsConfig(data.settings.salaryComponentsConfig);
+        } else {
+          setSalaryComponentsConfig({
+            earnings: [
+              { id: "basic", name: "Basic Salary", type: "PERCENT_CTC", value: data.settings.defaultBasicPercent ?? 50, isDefault: true },
+              { id: "hra", name: "House Rent Allowance (HRA)", type: "PERCENT_CTC", value: data.settings.defaultHraPercent ?? 30, isDefault: true },
+              { id: "special", name: "Special Allowance", type: "PERCENT_CTC", value: data.settings.defaultSpecialPercent ?? 20, isDefault: true },
+            ],
+            deductions: [
+              { id: "pf", name: "Provident Fund (PF)", type: "PERCENT_BASIC", value: data.settings.defaultPfPercent ?? 12, threshold: 15000, isDefault: true },
+              { id: "pt", name: "Professional Tax (PT)", type: "FIXED", value: data.settings.defaultPtAmount ?? 200, threshold: 15000, isDefault: true },
+            ],
+            otMultiplier: data.settings.defaultOtMultiplier ?? 1.5,
+          });
+        }
       }
     } catch (e) {
       console.error(e);
     }
     setShowSalaryComponentsModal(true);
+  };
+
+  const handleUpdateEarning = (index: number, patch: Partial<SalaryEarningComponent>) => {
+    setSalaryComponentsConfig((prev) => {
+      const earnings = [...prev.earnings];
+      earnings[index] = { ...earnings[index], ...patch };
+      return { ...prev, earnings };
+    });
+  };
+
+  const handleAddEarning = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newEarningName.trim()) return;
+    const cleanId = newEarningName
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, "_")
+      .slice(0, 16) + "_" + Math.floor(100 + Math.random() * 900);
+
+    const newComp: SalaryEarningComponent = {
+      id: cleanId,
+      name: newEarningName.trim(),
+      type: newEarningType,
+      value: Number(newEarningValue) || 0,
+      isDefault: false,
+    };
+
+    setSalaryComponentsConfig((prev) => ({
+      ...prev,
+      earnings: [...prev.earnings, newComp],
+    }));
+    setNewEarningName("");
+    setNewEarningValue(5);
+  };
+
+  const handleDeleteEarning = (index: number) => {
+    setSalaryComponentsConfig((prev) => ({
+      ...prev,
+      earnings: prev.earnings.filter((_, i) => i !== index),
+    }));
+  };
+
+  const handleUpdateDeduction = (index: number, patch: Partial<SalaryDeductionComponent>) => {
+    setSalaryComponentsConfig((prev) => {
+      const deductions = [...prev.deductions];
+      deductions[index] = { ...deductions[index], ...patch };
+      return { ...prev, deductions };
+    });
+  };
+
+  const handleAddDeduction = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newDeductionName.trim()) return;
+    const cleanId = newDeductionName
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, "_")
+      .slice(0, 16) + "_" + Math.floor(100 + Math.random() * 900);
+
+    const newComp: SalaryDeductionComponent = {
+      id: cleanId,
+      name: newDeductionName.trim(),
+      type: newDeductionType,
+      value: Number(newDeductionValue) || 0,
+      threshold: Number(newDeductionThreshold) || undefined,
+      isDefault: false,
+    };
+
+    setSalaryComponentsConfig((prev) => ({
+      ...prev,
+      deductions: [...prev.deductions, newComp],
+    }));
+    setNewDeductionName("");
+    setNewDeductionValue(200);
+  };
+
+  const handleDeleteDeduction = (index: number) => {
+    setSalaryComponentsConfig((prev) => ({
+      ...prev,
+      deductions: prev.deductions.filter((_, i) => i !== index),
+    }));
   };
 
   const handleSaveSalaryComponents = async (e: React.FormEvent) => {
@@ -82,12 +193,7 @@ export default function EmployeeManagement({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          defaultBasicPercent: compBasicPercent,
-          defaultHraPercent: compHraPercent,
-          defaultSpecialPercent: compSpecialPercent,
-          defaultPfPercent: compPfPercent,
-          defaultPtAmount: compPtAmount,
-          defaultOtMultiplier: compOtMultiplier,
+          salaryComponentsConfig,
         }),
       });
       const data = await res.json();
@@ -1108,7 +1214,7 @@ export default function EmployeeManagement({
           onClick={() => setShowSalaryComponentsModal(false)}
         >
           <div
-            className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-lg w-full overflow-hidden"
+            className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-2xl w-full overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Modal Header */}
@@ -1120,7 +1226,7 @@ export default function EmployeeManagement({
                     Set Earning &amp; Deduction Components
                   </h3>
                   <p className="text-[11px] text-emerald-200">
-                    Standard percentages &amp; statutory deductions for employee salary slips
+                    Rename components, customize percentages, or add new earnings &amp; deductions for employee payslips
                   </p>
                 </div>
               </div>
@@ -1134,7 +1240,7 @@ export default function EmployeeManagement({
             </div>
 
             {/* Modal Body */}
-            <form onSubmit={handleSaveSalaryComponents} className="p-6 space-y-4 text-xs">
+            <form onSubmit={handleSaveSalaryComponents} className="p-6 space-y-4 text-xs max-h-[80vh] overflow-y-auto">
               {compMessage && (
                 <div
                   className={`p-3 rounded-xl border flex items-center space-x-2 ${
@@ -1157,153 +1263,319 @@ export default function EmployeeManagement({
                   <Coins className="w-3.5 h-3.5 text-emerald-700" /> Company-wide Standard CTC Breakdown
                 </span>
                 <p className="text-[11px] text-emerald-800">
-                  When calculating employee salary slips, these percentages automatically partition gross CTC into Basic Pay, HRA, and Special Allowances.
+                  Rename components or add new custom earnings and deductions. When calculating salary slips, these components will be dynamically computed and displayed.
                 </p>
               </div>
 
-              {/* Earnings Components */}
+              {/* 1. Earnings Breakdown */}
               <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-3">
                 <div className="flex items-center justify-between border-b border-slate-200 pb-2">
                   <span className="font-extrabold text-slate-800 text-xs uppercase tracking-wider">
-                    Earnings Breakdown (% of CTC)
+                    1. Earning Components ({salaryComponentsConfig.earnings.length})
                   </span>
-                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                    compBasicPercent + compHraPercent + compSpecialPercent === 100
-                      ? "bg-emerald-100 text-emerald-800"
-                      : "bg-amber-100 text-amber-800"
-                  }`}>
-                    Sum: {compBasicPercent + compHraPercent + compSpecialPercent}% CTC
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
+                    Total:{" "}
+                    {salaryComponentsConfig.earnings
+                      .filter((e) => e.type === "PERCENT_CTC")
+                      .reduce((sum, e) => sum + (Number(e.value) || 0), 0)}
+                    % CTC
                   </span>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <div>
-                    <label className="block text-[11px] font-bold text-slate-700 mb-1">
-                      Basic Salary
-                    </label>
-                    <div className="flex items-center gap-1.5">
-                      <input
-                        type="number"
-                        min={10}
-                        max={100}
-                        step={1}
-                        required
-                        value={compBasicPercent}
-                        onChange={(e) => setCompBasicPercent(parseFloat(e.target.value) || 0)}
-                        className="w-full px-3 py-1.5 border border-slate-300 rounded-lg font-bold text-slate-900 bg-white"
-                      />
-                      <span className="text-xs font-bold text-slate-600">%</span>
-                    </div>
-                    <span className="text-[10px] text-slate-500 mt-0.5 block">Standard: 50%</span>
-                  </div>
+                <div className="space-y-2.5">
+                  {salaryComponentsConfig.earnings.map((earning, idx) => (
+                    <div
+                      key={earning.id || idx}
+                      className="p-2.5 bg-white border border-slate-200 rounded-lg flex items-center justify-between gap-3 shadow-2xs"
+                    >
+                      <div className="flex-1">
+                        <input
+                          type="text"
+                          required
+                          value={earning.name}
+                          onChange={(e) => handleUpdateEarning(idx, { name: e.target.value })}
+                          className="w-full px-2 py-1 font-bold text-slate-900 border border-slate-300 rounded text-xs bg-white"
+                          placeholder="Component Name"
+                        />
+                      </div>
 
-                  <div>
-                    <label className="block text-[11px] font-bold text-slate-700 mb-1">
-                      HRA
-                    </label>
-                    <div className="flex items-center gap-1.5">
-                      <input
-                        type="number"
-                        min={0}
-                        max={100}
-                        step={1}
-                        required
-                        value={compHraPercent}
-                        onChange={(e) => setCompHraPercent(parseFloat(e.target.value) || 0)}
-                        className="w-full px-3 py-1.5 border border-slate-300 rounded-lg font-bold text-slate-900 bg-white"
-                      />
-                      <span className="text-xs font-bold text-slate-600">%</span>
-                    </div>
-                    <span className="text-[10px] text-slate-500 mt-0.5 block">Standard: 30%</span>
-                  </div>
+                      <div className="w-28">
+                        <select
+                          value={earning.type}
+                          onChange={(e) =>
+                            handleUpdateEarning(idx, {
+                              type: e.target.value as "PERCENT_CTC" | "FIXED",
+                            })
+                          }
+                          className="w-full px-2 py-1 border border-slate-300 rounded text-xs bg-white font-medium"
+                        >
+                          <option value="PERCENT_CTC">% of CTC</option>
+                          <option value="FIXED">Fixed (₹)</option>
+                        </select>
+                      </div>
 
-                  <div>
-                    <label className="block text-[11px] font-bold text-slate-700 mb-1">
-                      Special Allowance
-                    </label>
-                    <div className="flex items-center gap-1.5">
-                      <input
-                        type="number"
-                        min={0}
-                        max={100}
-                        step={1}
-                        required
-                        value={compSpecialPercent}
-                        onChange={(e) => setCompSpecialPercent(parseFloat(e.target.value) || 0)}
-                        className="w-full px-3 py-1.5 border border-slate-300 rounded-lg font-bold text-slate-900 bg-white"
-                      />
-                      <span className="text-xs font-bold text-slate-600">%</span>
+                      <div className="w-24 flex items-center gap-1">
+                        <input
+                          type="number"
+                          min={0}
+                          step={earning.type === "PERCENT_CTC" ? 1 : 50}
+                          value={earning.value}
+                          onChange={(e) =>
+                            handleUpdateEarning(idx, {
+                              value: parseFloat(e.target.value) || 0,
+                            })
+                          }
+                          className="w-full px-2 py-1 border border-slate-300 rounded text-xs bg-white font-bold text-right"
+                        />
+                        <span className="text-xs font-semibold text-slate-600">
+                          {earning.type === "PERCENT_CTC" ? "%" : "₹"}
+                        </span>
+                      </div>
+
+                      {!earning.isDefault && (
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteEarning(idx)}
+                          className="text-slate-400 hover:text-rose-600 p-1 rounded transition cursor-pointer"
+                          title="Delete component"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      )}
                     </div>
-                    <span className="text-[10px] text-slate-500 mt-0.5 block">Standard: 20%</span>
+                  ))}
+                </div>
+
+                {/* Add Custom Earning Component */}
+                <div className="bg-emerald-50/60 border border-emerald-200 rounded-lg p-3 space-y-2">
+                  <span className="font-bold text-emerald-950 text-xs flex items-center gap-1">
+                    <Plus className="w-3.5 h-3.5 text-emerald-700" /> Add Custom Earning Component
+                  </span>
+                  <div className="grid grid-cols-1 sm:grid-cols-4 gap-2 items-end">
+                    <div className="sm:col-span-2">
+                      <label className="block text-[10px] font-bold text-slate-600 mb-0.5">
+                        Component Name
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="e.g. Medical Allowance, Conveyance..."
+                        value={newEarningName}
+                        onChange={(e) => setNewEarningName(e.target.value)}
+                        className="w-full px-2 py-1 border border-slate-300 rounded text-xs bg-white"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-600 mb-0.5">
+                        Type
+                      </label>
+                      <select
+                        value={newEarningType}
+                        onChange={(e) =>
+                          setNewEarningType(e.target.value as "PERCENT_CTC" | "FIXED")
+                        }
+                        className="w-full px-2 py-1 border border-slate-300 rounded text-xs bg-white"
+                      >
+                        <option value="PERCENT_CTC">% of CTC</option>
+                        <option value="FIXED">Fixed (₹)</option>
+                      </select>
+                    </div>
+
+                    <div className="flex items-center gap-1.5">
+                      <div className="flex-1">
+                        <label className="block text-[10px] font-bold text-slate-600 mb-0.5">
+                          Value
+                        </label>
+                        <input
+                          type="number"
+                          min={0}
+                          value={newEarningValue}
+                          onChange={(e) => setNewEarningValue(parseFloat(e.target.value) || 0)}
+                          className="w-full px-2 py-1 border border-slate-300 rounded text-xs bg-white font-bold"
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleAddEarning}
+                        disabled={!newEarningName.trim()}
+                        className="mt-4 px-3 py-1 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded text-xs font-bold transition cursor-pointer"
+                      >
+                        Add
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
 
-              {/* Deductions Components */}
+              {/* 2. Deductions Components & Overtime */}
               <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-3">
-                <span className="font-extrabold text-slate-800 text-xs uppercase tracking-wider block border-b border-slate-200 pb-2">
-                  Overtime &amp; Statutory Deductions
-                </span>
-
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <div>
-                    <label className="block text-[11px] font-bold text-slate-700 mb-1">
-                      OT Multiplier
-                    </label>
-                    <div className="flex items-center gap-1.5">
-                      <input
-                        type="number"
-                        min={1}
-                        max={3}
-                        step={0.1}
-                        required
-                        value={compOtMultiplier}
-                        onChange={(e) => setCompOtMultiplier(parseFloat(e.target.value) || 1)}
-                        className="w-full px-3 py-1.5 border border-slate-300 rounded-lg font-bold text-slate-900 bg-white"
-                      />
-                      <span className="text-xs font-bold text-slate-600">&times;</span>
-                    </div>
-                    <span className="text-[10px] text-slate-500 mt-0.5 block">Standard: 1.5&times; rate</span>
+                <div className="flex items-center justify-between border-b border-slate-200 pb-2">
+                  <span className="font-extrabold text-slate-800 text-xs uppercase tracking-wider">
+                    2. Deduction Components ({salaryComponentsConfig.deductions.length})
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[11px] font-semibold text-slate-600">OT Multiplier:</span>
+                    <input
+                      type="number"
+                      min={1}
+                      max={3}
+                      step={0.1}
+                      value={salaryComponentsConfig.otMultiplier}
+                      onChange={(e) =>
+                        setSalaryComponentsConfig((prev) => ({
+                          ...prev,
+                          otMultiplier: parseFloat(e.target.value) || 1,
+                        }))
+                      }
+                      className="w-16 px-1.5 py-0.5 border border-slate-300 rounded font-bold text-center bg-white"
+                    />
+                    <span className="text-xs font-bold text-slate-600">&times;</span>
                   </div>
+                </div>
 
-                  <div>
-                    <label className="block text-[11px] font-bold text-slate-700 mb-1">
-                      Provident Fund (PF)
-                    </label>
-                    <div className="flex items-center gap-1.5">
+                <div className="space-y-2.5">
+                  {salaryComponentsConfig.deductions.map((deduction, idx) => (
+                    <div
+                      key={deduction.id || idx}
+                      className="p-2.5 bg-white border border-slate-200 rounded-lg flex items-center justify-between gap-3 shadow-2xs"
+                    >
+                      <div className="flex-1">
+                        <input
+                          type="text"
+                          required
+                          value={deduction.name}
+                          onChange={(e) => handleUpdateDeduction(idx, { name: e.target.value })}
+                          className="w-full px-2 py-1 font-bold text-slate-900 border border-slate-300 rounded text-xs bg-white"
+                          placeholder="Component Name"
+                        />
+                      </div>
+
+                      <div className="w-32">
+                        <select
+                          value={deduction.type}
+                          onChange={(e) =>
+                            handleUpdateDeduction(idx, {
+                              type: e.target.value as "PERCENT_BASIC" | "PERCENT_CTC" | "FIXED",
+                            })
+                          }
+                          className="w-full px-2 py-1 border border-slate-300 rounded text-xs bg-white font-medium"
+                        >
+                          <option value="PERCENT_BASIC">% of Basic</option>
+                          <option value="PERCENT_CTC">% of CTC</option>
+                          <option value="FIXED">Fixed (₹)</option>
+                        </select>
+                      </div>
+
+                      <div className="w-24 flex items-center gap-1">
+                        <input
+                          type="number"
+                          min={0}
+                          step={deduction.type === "FIXED" ? 50 : 0.5}
+                          value={deduction.value}
+                          onChange={(e) =>
+                            handleUpdateDeduction(idx, {
+                              value: parseFloat(e.target.value) || 0,
+                            })
+                          }
+                          className="w-full px-2 py-1 border border-slate-300 rounded text-xs bg-white font-bold text-right"
+                        />
+                        <span className="text-xs font-semibold text-slate-600">
+                          {deduction.type === "FIXED" ? "₹" : "%"}
+                        </span>
+                      </div>
+
+                      <div className="w-28 flex items-center gap-1">
+                        <span className="text-[10px] text-slate-500">Min:</span>
+                        <input
+                          type="number"
+                          min={0}
+                          step={1000}
+                          placeholder="Thresh"
+                          value={deduction.threshold || ""}
+                          onChange={(e) =>
+                            handleUpdateDeduction(idx, {
+                              threshold: e.target.value === "" ? undefined : parseFloat(e.target.value) || 0,
+                            })
+                          }
+                          className="w-full px-1.5 py-1 border border-slate-300 rounded text-xs bg-white text-right"
+                        />
+                      </div>
+
+                      {!deduction.isDefault && (
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteDeduction(idx)}
+                          className="text-slate-400 hover:text-rose-600 p-1 rounded transition cursor-pointer"
+                          title="Delete component"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+
+                {/* Add Custom Deduction Component */}
+                <div className="bg-rose-50/60 border border-rose-200 rounded-lg p-3 space-y-2">
+                  <span className="font-bold text-rose-950 text-xs flex items-center gap-1">
+                    <Plus className="w-3.5 h-3.5 text-rose-700" /> Add Custom Deduction Component
+                  </span>
+                  <div className="grid grid-cols-1 sm:grid-cols-5 gap-2 items-end">
+                    <div className="sm:col-span-2">
+                      <label className="block text-[10px] font-bold text-slate-600 mb-0.5">
+                        Component Name
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="e.g. Health Insurance, TDS..."
+                        value={newDeductionName}
+                        onChange={(e) => setNewDeductionName(e.target.value)}
+                        className="w-full px-2 py-1 border border-slate-300 rounded text-xs bg-white"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-600 mb-0.5">
+                        Type
+                      </label>
+                      <select
+                        value={newDeductionType}
+                        onChange={(e) =>
+                          setNewDeductionType(
+                            e.target.value as "PERCENT_BASIC" | "PERCENT_CTC" | "FIXED"
+                          )
+                        }
+                        className="w-full px-2 py-1 border border-slate-300 rounded text-xs bg-white"
+                      >
+                        <option value="PERCENT_BASIC">% of Basic</option>
+                        <option value="PERCENT_CTC">% of CTC</option>
+                        <option value="FIXED">Fixed (₹)</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-600 mb-0.5">
+                        Value
+                      </label>
                       <input
                         type="number"
                         min={0}
-                        max={20}
-                        step={0.5}
-                        required
-                        value={compPfPercent}
-                        onChange={(e) => setCompPfPercent(parseFloat(e.target.value) || 0)}
-                        className="w-full px-3 py-1.5 border border-slate-300 rounded-lg font-bold text-slate-900 bg-white"
+                        value={newDeductionValue}
+                        onChange={(e) => setNewDeductionValue(parseFloat(e.target.value) || 0)}
+                        className="w-full px-2 py-1 border border-slate-300 rounded text-xs bg-white font-bold"
                       />
-                      <span className="text-xs font-bold text-slate-600">%</span>
                     </div>
-                    <span className="text-[10px] text-slate-500 mt-0.5 block">12% on Basic &ge; 15k</span>
-                  </div>
 
-                  <div>
-                    <label className="block text-[11px] font-bold text-slate-700 mb-1">
-                      Professional Tax (PT)
-                    </label>
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-xs font-bold text-slate-600">₹</span>
-                      <input
-                        type="number"
-                        min={0}
-                        max={1000}
-                        step={10}
-                        required
-                        value={compPtAmount}
-                        onChange={(e) => setCompPtAmount(parseFloat(e.target.value) || 0)}
-                        className="w-full px-3 py-1.5 border border-slate-300 rounded-lg font-bold text-slate-900 bg-white"
-                      />
+                    <div>
+                      <button
+                        type="button"
+                        onClick={handleAddDeduction}
+                        disabled={!newDeductionName.trim()}
+                        className="w-full py-1 px-3 bg-rose-600 hover:bg-rose-700 disabled:opacity-50 text-white rounded text-xs font-bold transition cursor-pointer"
+                      >
+                        Add
+                      </button>
                     </div>
-                    <span className="text-[10px] text-slate-500 mt-0.5 block">Standard: ₹200 / mo</span>
                   </div>
                 </div>
               </div>

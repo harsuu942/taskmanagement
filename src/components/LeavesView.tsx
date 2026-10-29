@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo } from "react";
-import { User, LeaveRequest, LeaveStats, LeaveType, LeaveStatus, LeaveSummaryItem } from "@/types";
+import { User, LeaveRequest, LeaveStats, LeaveType, LeaveStatus, LeaveSummaryItem, CustomLeaveTypeConfig } from "@/types";
 import {
   CalendarDays,
   Plus,
@@ -51,6 +51,7 @@ export default function LeavesView({
   const [leaves, setLeaves] = useState<LeaveRequest[]>([]);
   const [stats, setStats] = useState<LeaveStats | null>(null);
   const [leaveSummary, setLeaveSummary] = useState<LeaveSummaryItem[]>([]);
+  const [configuredLeaveTypes, setConfiguredLeaveTypes] = useState<CustomLeaveTypeConfig[]>([]);
   const [holidaysList, setHolidaysList] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -115,11 +116,11 @@ export default function LeavesView({
 
   // Leave Settings Modal State (Admin: Configure Leave Types & Quotas)
   const [isLeaveSettingsModalOpen, setIsLeaveSettingsModalOpen] = useState(false);
-  const [earnedDaysSetting, setEarnedDaysSetting] = useState<number>(18);
-  const [earnedAccrualSetting, setEarnedAccrualSetting] = useState<number>(1.5);
-  const [casualDaysSetting, setCasualDaysSetting] = useState<number>(0);
-  const [sickDaysSetting, setSickDaysSetting] = useState<number>(0);
-  const [unpaidEnabledSetting, setUnpaidEnabledSetting] = useState<boolean>(false);
+  const [leaveTypesConfigList, setLeaveTypesConfigList] = useState<CustomLeaveTypeConfig[]>([]);
+  const [newTypeName, setNewTypeName] = useState("");
+  const [newTypeDays, setNewTypeDays] = useState<number>(10);
+  const [newTypeAccrual, setNewTypeAccrual] = useState<number>(0);
+  const [newTypeIsPaid, setNewTypeIsPaid] = useState<boolean>(true);
   const [leaveSettingsLoading, setLeaveSettingsLoading] = useState(false);
   const [leaveSettingsMsg, setLeaveSettingsMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
@@ -129,16 +130,58 @@ export default function LeavesView({
       const res = await fetch("/api/settings");
       const data = await res.json();
       if (data.settings) {
-        setEarnedDaysSetting(data.settings.earnedDays ?? 18);
-        setEarnedAccrualSetting(data.settings.earnedLeaveAccrual ?? 1.5);
-        setCasualDaysSetting(data.settings.casualDays ?? 0);
-        setSickDaysSetting(data.settings.sickDays ?? 0);
-        setUnpaidEnabledSetting(data.settings.unpaidEnabled ?? false);
+        if (data.settings.leaveTypesConfig && Array.isArray(data.settings.leaveTypesConfig)) {
+          setLeaveTypesConfigList(data.settings.leaveTypesConfig);
+        } else {
+          setLeaveTypesConfigList([
+            { id: "EARNED", name: "Earned Leave (EL)", annualDays: data.settings.earnedDays ?? 18, accrualRate: data.settings.earnedLeaveAccrual ?? 1.5, isPaid: true, isDefault: true },
+            { id: "CASUAL", name: "Casual Leave (CL)", annualDays: data.settings.casualDays ?? 0, accrualRate: 0, isPaid: true, isDefault: true },
+            { id: "SICK", name: "Sick Leave (SL)", annualDays: data.settings.sickDays ?? 0, accrualRate: 0, isPaid: true, isDefault: true },
+            { id: "UNPAID", name: "Unpaid Leave (LWP)", annualDays: 0, accrualRate: 0, isPaid: false, isDefault: true },
+          ]);
+        }
       }
     } catch (e) {
       console.error(e);
     }
     setIsLeaveSettingsModalOpen(true);
+  };
+
+  const handleUpdateLeaveTypeField = (index: number, patch: Partial<CustomLeaveTypeConfig>) => {
+    setLeaveTypesConfigList((prev) => {
+      const copy = [...prev];
+      copy[index] = { ...copy[index], ...patch };
+      return copy;
+    });
+  };
+
+  const handleAddCustomLeaveType = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newTypeName.trim()) return;
+    const cleanId = newTypeName
+      .trim()
+      .toUpperCase()
+      .replace(/[^A-Z0-9]/g, "_")
+      .slice(0, 16) + "_" + Math.floor(100 + Math.random() * 900);
+
+    const newEntry: CustomLeaveTypeConfig = {
+      id: cleanId,
+      name: newTypeName.trim(),
+      annualDays: Number(newTypeDays) || 0,
+      accrualRate: Number(newTypeAccrual) || 0,
+      isPaid: newTypeIsPaid,
+      isDefault: false,
+    };
+
+    setLeaveTypesConfigList((prev) => [...prev, newEntry]);
+    setNewTypeName("");
+    setNewTypeDays(10);
+    setNewTypeAccrual(0);
+    setNewTypeIsPaid(true);
+  };
+
+  const handleDeleteCustomLeaveType = (index: number) => {
+    setLeaveTypesConfigList((prev) => prev.filter((_, i) => i !== index));
   };
 
   const handleSaveLeaveSettings = async (e: React.FormEvent) => {
@@ -150,12 +193,7 @@ export default function LeavesView({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          earnedDays: earnedDaysSetting,
-          earnedLeaveAccrual: earnedAccrualSetting,
-          casualDays: casualDaysSetting,
-          sickDays: sickDaysSetting,
-          unpaidEnabled: unpaidEnabledSetting,
-          annualLeaveQuota: earnedDaysSetting + casualDaysSetting + sickDaysSetting,
+          leaveTypesConfig: leaveTypesConfigList,
         }),
       });
       const data = await res.json();
@@ -312,6 +350,9 @@ export default function LeavesView({
         setLeaves(data.leaves || []);
         setStats(data.stats || null);
         setLeaveSummary(data.leaveSummary || []);
+        if (data.configuredLeaveTypes && Array.isArray(data.configuredLeaveTypes)) {
+          setConfiguredLeaveTypes(data.configuredLeaveTypes);
+        }
       }
 
       // Also fetch holidays
@@ -350,6 +391,82 @@ export default function LeavesView({
     if (end < start) return 0;
     return Math.round((end - start) / (1000 * 3600 * 24)) + 1;
   }, [applyStartDate, applyEndDate, applyType, isHourly, durationHours]);
+
+  // Selected Employee Leave Balance & Stats for Apply Form
+  const selectedEmployeeStats = useMemo(() => {
+    const targetId = isAdmin ? applyUserId : currentUser?.id;
+    const approvedLeaves = leaves.filter(
+      (l) => l.userId === targetId && l.status === "APPROVED"
+    );
+
+    const typeIdUpper = String(applyType).toUpperCase();
+    const typeCfg = configuredLeaveTypes.find((t) => String(t.id).toUpperCase() === typeIdUpper);
+    const isPaidType = typeCfg ? typeCfg.isPaid !== false : (typeIdUpper !== "UNPAID");
+    const quota = typeCfg ? parseFloat(String(typeCfg.annualDays)) || 0 : 0;
+
+    const taken = approvedLeaves
+      .filter((l) => {
+        const lType = l.leaveType.toUpperCase();
+        if (typeIdUpper === "CASUAL" && (lType === "HALF_DAY" || lType === "HOURLY")) return true;
+        return lType === typeIdUpper;
+      })
+      .reduce((acc, l) => acc + (l.daysCount || 1), 0);
+
+    const currentBalance = Math.max(0, parseFloat((quota - taken).toFixed(2)));
+    const requestedDays = calculatedDays;
+    const balanceAfter = Math.max(0, parseFloat((currentBalance - requestedDays).toFixed(2)));
+    const isZeroBalance = isPaidType && currentBalance <= 0 && typeIdUpper !== "UNPAID";
+
+    return {
+      quota,
+      taken: parseFloat(taken.toFixed(2)),
+      currentBalance,
+      requestedDays,
+      balanceAfter,
+      isPaidType,
+      isZeroBalance,
+      typeName: typeCfg?.name || applyType,
+    };
+  }, [applyUserId, currentUser, leaves, applyType, configuredLeaveTypes, calculatedDays, isAdmin]);
+
+  // Dynamic leave types list for Apply Leave Form
+  const availableTypeOptions = useMemo(() => {
+    const list: { type: string; label: string; icon: any; isPaid: boolean }[] = [];
+
+    if (configuredLeaveTypes && configuredLeaveTypes.length > 0) {
+      configuredLeaveTypes.forEach((t) => {
+        let icon = Palmtree;
+        const upper = t.id.toUpperCase();
+        if (upper === "CASUAL") icon = Coffee;
+        else if (upper === "SICK") icon = HeartPulse;
+        else if (upper === "UNPAID") icon = Calendar;
+        else if (t.isPaid) icon = Palmtree;
+        else icon = Calendar;
+
+        list.push({
+          type: t.id,
+          label: t.name || t.id,
+          icon,
+          isPaid: t.isPaid !== false,
+        });
+      });
+    } else {
+      list.push(
+        { type: "EARNED", label: "Earned Leave (EL)", icon: Palmtree, isPaid: true },
+        { type: "CASUAL", label: "Casual Leave", icon: Coffee, isPaid: true },
+        { type: "SICK", label: "Sick Leave", icon: HeartPulse, isPaid: true },
+        { type: "UNPAID", label: "Unpaid Leave (LWP)", icon: Calendar, isPaid: false }
+      );
+    }
+
+    // Always include Half Day and Hourly options
+    list.push(
+      { type: "HALF_DAY", label: "Half Day (4h)", icon: Sun, isPaid: true },
+      { type: "HOURLY", label: "Hourly Leave (hrs)", icon: Clock, isPaid: true }
+    );
+
+    return list;
+  }, [configuredLeaveTypes]);
 
   // Client-side text & type filter
   const filteredLeaves = useMemo(() => {
@@ -424,6 +541,9 @@ export default function LeavesView({
       setApplyEndDate(todayStr);
       await fetchLeaves();
       if (onLeaveUpdated) onLeaveUpdated();
+      if (data.autoConvertedToUnpaid) {
+        alert(data.message || "Notice: Your available paid leave balance was 0, so this request was automatically applied as Unpaid Leave (Leave Without Pay / LWP).");
+      }
     } catch (err: any) {
       setApplyError(err.message);
     } finally {
@@ -1450,14 +1570,7 @@ export default function LeavesView({
                   Leave Type <span className="text-rose-500">*</span>
                 </label>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                  {[
-                    { type: "CASUAL", label: "Casual Leave", icon: Coffee },
-                    { type: "SICK", label: "Sick Leave", icon: HeartPulse },
-                    { type: "EARNED", label: "Earned / Paid", icon: Palmtree },
-                    { type: "UNPAID", label: "Unpaid Leave", icon: Calendar },
-                    { type: "HALF_DAY", label: "Half Day (4h)", icon: Sun },
-                    { type: "HOURLY", label: "Hourly Leave (hrs)", icon: Clock },
-                  ].map((t) => {
+                  {availableTypeOptions.map((t) => {
                     const Icon = t.icon;
                     const isSelected = (t.type === "HOURLY" && isHourly) || (!isHourly && applyType === t.type);
                     return (
@@ -1473,18 +1586,75 @@ export default function LeavesView({
                             setApplyType(t.type as LeaveType);
                           }
                         }}
-                        className={`p-2 rounded-lg border text-left flex items-center space-x-2 transition ${
+                        className={`p-2 rounded-lg border text-left flex items-center space-x-2 transition cursor-pointer ${
                           isSelected
                             ? "bg-rose-50 border-rose-500 text-rose-900 font-bold ring-1 ring-rose-500"
                             : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50"
                         }`}
                       >
                         <Icon className={`w-3.5 h-3.5 ${isSelected ? "text-rose-600" : "text-slate-400"}`} />
-                        <span className="text-[11px]">{t.label}</span>
+                        <span className="text-[11px] truncate">{t.label}</span>
                       </button>
                     );
                   })}
                 </div>
+              </div>
+
+              {/* Real-time Leave Balance & Availability Card */}
+              <div className={`p-3.5 rounded-xl border transition-all ${
+                selectedEmployeeStats.isZeroBalance
+                  ? "bg-amber-50/90 border-amber-300"
+                  : "bg-slate-50 border-slate-200"
+              }`}>
+                <div className="flex items-center justify-between text-xs mb-2">
+                  <span className="font-bold text-slate-800 flex items-center gap-1.5">
+                    <Sparkles className="w-3.5 h-3.5 text-blue-600" />
+                    Pending Balance: {selectedEmployeeStats.typeName}
+                  </span>
+                  {selectedEmployeeStats.isPaidType && (
+                    <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full ${
+                      selectedEmployeeStats.currentBalance > 0
+                        ? "bg-emerald-100 text-emerald-800 border border-emerald-200"
+                        : "bg-rose-100 text-rose-800 border border-rose-200"
+                    }`}>
+                      {selectedEmployeeStats.currentBalance > 0 ? "Paid Quota Available" : "0 Paid Balance (LWP Auto-Apply)"}
+                    </span>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-3 gap-2 text-center text-xs">
+                  <div className="bg-white p-2 rounded-lg border border-slate-200 shadow-2xs">
+                    <span className="text-[10px] font-semibold text-slate-500 uppercase block">Available Quota</span>
+                    <span className={`font-extrabold text-sm ${selectedEmployeeStats.currentBalance > 0 ? "text-emerald-700" : "text-rose-600"}`}>
+                      {selectedEmployeeStats.isPaidType ? `${selectedEmployeeStats.currentBalance.toFixed(1)} d` : "Unpaid (LWP)"}
+                    </span>
+                  </div>
+                  <div className="bg-white p-2 rounded-lg border border-slate-200 shadow-2xs">
+                    <span className="text-[10px] font-semibold text-slate-500 uppercase block">Days Requested</span>
+                    <span className="font-extrabold text-sm text-blue-700">
+                      {selectedEmployeeStats.requestedDays.toFixed(2)} d
+                    </span>
+                  </div>
+                  <div className="bg-white p-2 rounded-lg border border-slate-200 shadow-2xs">
+                    <span className="text-[10px] font-semibold text-slate-500 uppercase block">Balance After</span>
+                    <span className="font-extrabold text-sm text-slate-800">
+                      {selectedEmployeeStats.isPaidType ? `${selectedEmployeeStats.balanceAfter.toFixed(1)} d` : "0 d"}
+                    </span>
+                  </div>
+                </div>
+
+                {/* If Zero Balance: Show Warning */}
+                {selectedEmployeeStats.isZeroBalance && (
+                  <div className="mt-2.5 p-2.5 bg-rose-50 border border-rose-200 rounded-lg text-rose-800 text-[11px] flex items-start gap-2">
+                    <AlertTriangle className="w-4 h-4 text-rose-600 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <span className="font-bold block">Zero Balance: Automatically Applied as Unpaid Leave</span>
+                      <span className="text-rose-700">
+                        You currently have 0 remaining {selectedEmployeeStats.typeName} balance. Submitting this request will automatically record it as <strong>Unpaid Leave (Leave Without Pay / LWP)</strong>.
+                      </span>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* If Hourly Leave Selected: Hours Input */}
@@ -2254,7 +2424,7 @@ export default function LeavesView({
           onClick={() => setIsLeaveSettingsModalOpen(false)}
         >
           <div
-            className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-lg w-full overflow-hidden"
+            className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-2xl w-full overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Modal Header */}
@@ -2266,7 +2436,7 @@ export default function LeavesView({
                     Leave Types &amp; Annual Quota Settings
                   </h3>
                   <p className="text-[11px] text-blue-200">
-                    Set days for each leave type. Types with 0 days are removed from leave summary cards.
+                    Rename leave types, configure annual quotas, or create new custom leave types. Types with 0 days are excluded from cards.
                   </p>
                 </div>
               </div>
@@ -2280,7 +2450,7 @@ export default function LeavesView({
             </div>
 
             {/* Modal Body */}
-            <form onSubmit={handleSaveLeaveSettings} className="p-6 space-y-4 text-xs">
+            <form onSubmit={handleSaveLeaveSettings} className="p-6 space-y-4 text-xs max-h-[80vh] overflow-y-auto">
               {leaveSettingsMsg && (
                 <div
                   className={`p-3 rounded-xl border flex items-center space-x-2 ${
@@ -2298,145 +2468,187 @@ export default function LeavesView({
                 </div>
               )}
 
-              {/* Earned Leave Section */}
-              <div className="bg-blue-50/60 border border-blue-200 rounded-xl p-4 space-y-3">
+              <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
-                    <Palmtree className="w-4 h-4 text-blue-700" />
-                    <span className="font-extrabold text-blue-950 text-xs uppercase tracking-wider">
-                      Earned Leave (EL) &bull; Primary Policy
-                    </span>
-                  </div>
-                  <span className="bg-blue-200 text-blue-900 text-[10px] font-extrabold px-2 py-0.5 rounded-full">
-                    Active
+                  <span className="font-extrabold text-slate-800 uppercase tracking-wider text-[11px]">
+                    Configured Leave Types ({leaveTypesConfigList.length})
+                  </span>
+                  <span className="text-[10px] text-slate-500">
+                    Edit names, quotas, or accrual rates below
                   </span>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                {leaveTypesConfigList.map((type, idx) => (
+                  <div
+                    key={type.id || idx}
+                    className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl space-y-2.5"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 flex-1">
+                        <input
+                          type="text"
+                          required
+                          value={type.name}
+                          onChange={(e) => handleUpdateLeaveTypeField(idx, { name: e.target.value })}
+                          className="px-2.5 py-1.5 border border-slate-300 rounded-lg font-bold text-slate-900 bg-white text-xs w-full max-w-xs focus:ring-2 focus:ring-blue-500 outline-none"
+                          placeholder="Leave Type Name"
+                        />
+                        <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full ${
+                          type.isPaid ? "bg-emerald-100 text-emerald-800" : "bg-slate-200 text-slate-700"
+                        }`}>
+                          {type.isPaid ? "Paid Leave" : "Unpaid / LWP"}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <label className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-600 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={type.isPaid}
+                            onChange={(e) => handleUpdateLeaveTypeField(idx, { isPaid: e.target.checked })}
+                            className="rounded text-blue-600"
+                          />
+                          <span>Paid</span>
+                        </label>
+
+                        {!type.isDefault && (
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteCustomLeaveType(idx)}
+                            className="text-slate-400 hover:text-rose-600 p-1 rounded transition cursor-pointer"
+                            title="Delete custom leave type"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3 text-xs pt-1 border-t border-slate-200/80">
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-600 mb-0.5">
+                          Annual Quota Days {type.annualDays === 0 && <span className="text-amber-600">(0d = Hidden)</span>}
+                        </label>
+                        <input
+                          type="number"
+                          min={0}
+                          max={365}
+                          step={0.5}
+                          value={type.annualDays}
+                          onChange={(e) =>
+                            handleUpdateLeaveTypeField(idx, {
+                              annualDays: parseFloat(e.target.value) || 0,
+                            })
+                          }
+                          className="w-full px-2.5 py-1 border border-slate-300 rounded-lg font-bold text-slate-900 bg-white"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-600 mb-0.5">
+                          Monthly Accrual (Days / Month)
+                        </label>
+                        <input
+                          type="number"
+                          min={0}
+                          max={30}
+                          step={0.1}
+                          value={type.accrualRate || 0}
+                          onChange={(e) =>
+                            handleUpdateLeaveTypeField(idx, {
+                              accrualRate: parseFloat(e.target.value) || 0,
+                            })
+                          }
+                          className="w-full px-2.5 py-1 border border-slate-300 rounded-lg font-bold text-slate-900 bg-white"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Add Custom Leave Type Box */}
+              <div className="bg-blue-50/70 border border-blue-200 rounded-xl p-3.5 space-y-3">
+                <span className="font-extrabold text-blue-950 text-xs flex items-center gap-1.5 uppercase tracking-wider">
+                  <Plus className="w-4 h-4 text-blue-700" /> + Add Custom Leave Type
+                </span>
+
+                <div className="grid grid-cols-1 sm:grid-cols-4 gap-2.5 items-end">
+                  <div className="sm:col-span-2">
+                    <label className="block text-[10px] font-bold text-slate-700 mb-0.5">
+                      New Leave Type Name
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Maternity Leave, Comp-Off..."
+                      value={newTypeName}
+                      onChange={(e) => setNewTypeName(e.target.value)}
+                      className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg text-xs font-semibold bg-white"
+                    />
+                  </div>
+
                   <div>
-                    <label className="block text-[11px] font-bold text-slate-700 mb-1">
-                      Total Annual Days <span className="text-rose-500">*</span>
+                    <label className="block text-[10px] font-bold text-slate-700 mb-0.5">
+                      Annual Days
                     </label>
                     <input
                       type="number"
                       min={0}
                       max={365}
                       step={0.5}
-                      required
-                      value={earnedDaysSetting}
-                      onChange={(e) => {
-                        const val = parseFloat(e.target.value) || 0;
-                        setEarnedDaysSetting(val);
-                        setEarnedAccrualSetting(parseFloat((val / 12).toFixed(2)));
-                      }}
-                      className="w-full px-3 py-2 border border-slate-300 rounded-lg font-bold text-slate-900 bg-white"
+                      value={newTypeDays}
+                      onChange={(e) => setNewTypeDays(parseFloat(e.target.value) || 0)}
+                      className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg text-xs font-bold bg-white"
                     />
-                    <span className="text-[10px] text-slate-500 mt-0.5 block">Standard: 18 days/year</span>
                   </div>
 
                   <div>
-                    <label className="block text-[11px] font-bold text-slate-700 mb-1">
-                      Monthly Accrual (Days/Mo)
-                    </label>
+                    <button
+                      type="button"
+                      onClick={handleAddCustomLeaveType}
+                      disabled={!newTypeName.trim()}
+                      className="w-full py-1.5 px-3 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-lg font-bold text-xs transition cursor-pointer flex items-center justify-center gap-1"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>Add Type</span>
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-4 text-[11px] text-slate-600">
+                  <label className="flex items-center gap-1.5 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={newTypeIsPaid}
+                      onChange={(e) => setNewTypeIsPaid(e.target.checked)}
+                      className="rounded text-blue-600"
+                    />
+                    <span>Is Paid Leave</span>
+                  </label>
+
+                  <div className="flex items-center gap-1.5">
+                    <span>Accrual (Days/Mo):</span>
                     <input
                       type="number"
                       min={0}
                       max={30}
                       step={0.1}
-                      required
-                      value={earnedAccrualSetting}
-                      onChange={(e) => setEarnedAccrualSetting(parseFloat(e.target.value) || 0)}
-                      className="w-full px-3 py-2 border border-slate-300 rounded-lg font-bold text-slate-900 bg-white"
+                      value={newTypeAccrual}
+                      onChange={(e) => setNewTypeAccrual(parseFloat(e.target.value) || 0)}
+                      className="w-16 px-1.5 py-0.5 border border-slate-300 rounded text-xs bg-white text-center font-bold"
                     />
-                    <span className="text-[10px] text-slate-500 mt-0.5 block">e.g. 1.5 days accrued / month</span>
                   </div>
                 </div>
-              </div>
-
-              {/* Casual Leave Section */}
-              <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-2">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
-                    <Coffee className="w-4 h-4 text-amber-700" />
-                    <span className="font-extrabold text-slate-800 text-xs uppercase tracking-wider">
-                      Casual Leave (CL)
-                    </span>
-                  </div>
-                  <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full ${casualDaysSetting > 0 ? "bg-amber-100 text-amber-800" : "bg-slate-200 text-slate-600"}`}>
-                    {casualDaysSetting > 0 ? `${casualDaysSetting}d Configured` : "Removed (0d)"}
-                  </span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <input
-                    type="number"
-                    min={0}
-                    max={60}
-                    step={0.5}
-                    value={casualDaysSetting}
-                    onChange={(e) => setCasualDaysSetting(parseFloat(e.target.value) || 0)}
-                    className="w-28 px-3 py-1.5 border border-slate-300 rounded-lg font-bold text-slate-900 bg-white"
-                  />
-                  <p className="text-[11px] text-slate-500">
-                    Set to <span className="font-bold text-slate-700">0</span> to completely remove and hide Casual Leave from staff summary cards.
-                  </p>
-                </div>
-              </div>
-
-              {/* Sick Leave Section */}
-              <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-2">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
-                    <HeartPulse className="w-4 h-4 text-rose-700" />
-                    <span className="font-extrabold text-slate-800 text-xs uppercase tracking-wider">
-                      Sick Leave (SL)
-                    </span>
-                  </div>
-                  <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full ${sickDaysSetting > 0 ? "bg-rose-100 text-rose-800" : "bg-slate-200 text-slate-600"}`}>
-                    {sickDaysSetting > 0 ? `${sickDaysSetting}d Configured` : "Removed (0d)"}
-                  </span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <input
-                    type="number"
-                    min={0}
-                    max={60}
-                    step={0.5}
-                    value={sickDaysSetting}
-                    onChange={(e) => setSickDaysSetting(parseFloat(e.target.value) || 0)}
-                    className="w-28 px-3 py-1.5 border border-slate-300 rounded-lg font-bold text-slate-900 bg-white"
-                  />
-                  <p className="text-[11px] text-slate-500">
-                    Set to <span className="font-bold text-slate-700">0</span> to completely remove and hide Sick Leave from staff summary cards.
-                  </p>
-                </div>
-              </div>
-
-              {/* Unpaid / LWP Toggle */}
-              <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 flex items-center justify-between">
-                <div>
-                  <span className="font-bold text-slate-800 block text-xs">
-                    Unpaid Leave / Leave Without Pay (LWP) Card
-                  </span>
-                  <p className="text-[11px] text-slate-500 mt-0.5">
-                    Show LWP card in leave balance summary widget
-                  </p>
-                </div>
-                <label className="relative inline-flex items-center cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={unpaidEnabledSetting}
-                    onChange={(e) => setUnpaidEnabledSetting(e.target.checked)}
-                    className="sr-only peer"
-                  />
-                  <div className="w-9 h-5 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
-                </label>
               </div>
 
               {/* Total Paid Quota Preview Pill */}
               <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center justify-between text-xs">
                 <span className="font-bold text-emerald-900">Total Configured Annual Paid Quota:</span>
                 <span className="font-extrabold text-emerald-800 text-sm bg-white px-2.5 py-0.5 rounded-lg border border-emerald-300">
-                  {earnedDaysSetting + casualDaysSetting + sickDaysSetting} Days / Year
+                  {leaveTypesConfigList
+                    .filter((t) => t.isPaid)
+                    .reduce((sum, t) => sum + (parseFloat(String(t.annualDays)) || 0), 0)}{" "}
+                  Days / Year
                 </span>
               </div>
 

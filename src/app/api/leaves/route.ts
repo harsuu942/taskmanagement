@@ -126,13 +126,12 @@ export async function GET(request: Request) {
       .filter((l) => l.leaveType === "UNPAID")
       .reduce((acc, l) => acc + (l.daysCount || 1), 0);
 
-    const totalPaidTaken = parseFloat((casualTaken + sickTaken + earnedTaken).toFixed(2));
-    
     // Fetch dynamic leave settings configured by Admin
     const allSettings = await prisma.systemSetting.findMany({
       where: {
         key: {
           in: [
+            "LEAVE_TYPES_CONFIG",
             "ANNUAL_LEAVE_QUOTA",
             "EARNED_LEAVE_DAYS",
             "EARNED_LEAVE_ACCRUAL",
@@ -154,62 +153,69 @@ export async function GET(request: Request) {
     const sickDays = parseFloat(sMap["SICK_LEAVE_DAYS"] || "0");
     const unpaidEnabled = sMap["UNPAID_LEAVE_ENABLED"] === "true";
 
-    const totalPaidQuota = parseFloat((earnedDays + casualDays + sickDays).toFixed(2));
-    const totalBalance = parseFloat(Math.max(0, totalPaidQuota - totalPaidTaken).toFixed(2));
+    let configuredLeaveTypes: any[] = [];
+    if (sMap["LEAVE_TYPES_CONFIG"]) {
+      try {
+        configuredLeaveTypes = JSON.parse(sMap["LEAVE_TYPES_CONFIG"]);
+      } catch (e) {}
+    }
+    if (!configuredLeaveTypes || !Array.isArray(configuredLeaveTypes) || configuredLeaveTypes.length === 0) {
+      configuredLeaveTypes = [
+        { id: "EARNED", name: "Earned Leave (EL)", annualDays: earnedDays, accrualRate: earnedLeaveAccrual, isPaid: true, isDefault: true },
+        { id: "CASUAL", name: "Casual Leave (CL)", annualDays: casualDays, accrualRate: 0, isPaid: true, isDefault: true },
+        { id: "SICK", name: "Sick Leave (SL)", annualDays: sickDays, accrualRate: 0, isPaid: true, isDefault: true },
+        { id: "UNPAID", name: "Unpaid Leave (LWP)", annualDays: 0, accrualRate: 0, isPaid: false, isDefault: true },
+      ];
+    }
 
     const leaveSummary: any[] = [];
+    let totalPaidQuota = 0;
+    let totalPaidTaken = 0;
 
-    // 1. Earned Leave (EL) - Only if quota > 0
-    if (earnedDays > 0) {
-      leaveSummary.push({
-        leaveType: "EARNED",
-        label: "Earned Leave (EL)",
-        totalAvailable: earnedDays,
-        accrualRate: earnedLeaveAccrual,
-        taken: parseFloat(earnedTaken.toFixed(2)),
-        balance: parseFloat(Math.max(0, earnedDays - earnedTaken).toFixed(2)),
-      });
+    for (const type of configuredLeaveTypes) {
+      const isPaid = type.isPaid !== false;
+      const annualDays = parseFloat(type.annualDays) || 0;
+      const typeIdUpper = String(type.id).toUpperCase();
+
+      // Filter approved leaves taken for this type
+      const taken = approvedUserLeaves
+        .filter((l) => {
+          const lType = l.leaveType.toUpperCase();
+          if (typeIdUpper === "CASUAL" && (lType === "HALF_DAY" || lType === "HOURLY")) {
+            return true;
+          }
+          return lType === typeIdUpper;
+        })
+        .reduce((acc, l) => acc + (l.daysCount || 1), 0);
+
+      const takenFixed = parseFloat(taken.toFixed(2));
+      const balance = parseFloat(Math.max(0, annualDays - takenFixed).toFixed(2));
+
+      if (isPaid) {
+        totalPaidQuota += annualDays;
+        totalPaidTaken += takenFixed;
+      }
+
+      // Only push to summary cards if annualDays > 0 (or if unpaid and either enabled or taken > 0)
+      if (annualDays > 0 || (!isPaid && (unpaidEnabled || takenFixed > 0))) {
+        leaveSummary.push({
+          leaveType: type.id,
+          label: type.name || type.id,
+          totalAvailable: annualDays,
+          accrualRate: type.accrualRate || undefined,
+          taken: takenFixed,
+          balance: isPaid ? balance : 0,
+        });
+      }
     }
 
-    // 2. Casual Leave - Only if Admin configured a quota > 0
-    if (casualDays > 0) {
-      leaveSummary.push({
-        leaveType: "CASUAL",
-        label: "Casual Leave",
-        totalAvailable: casualDays,
-        taken: parseFloat(casualTaken.toFixed(2)),
-        balance: parseFloat(Math.max(0, casualDays - casualTaken).toFixed(2)),
-      });
-    }
-
-    // 3. Sick Leave - Only if Admin configured a quota > 0
-    if (sickDays > 0) {
-      leaveSummary.push({
-        leaveType: "SICK",
-        label: "Sick Leave",
-        totalAvailable: sickDays,
-        taken: parseFloat(sickTaken.toFixed(2)),
-        balance: parseFloat(Math.max(0, sickDays - sickTaken).toFixed(2)),
-      });
-    }
-
-    // 4. Unpaid Leave - Only if explicitly enabled by Admin
-    if (unpaidEnabled) {
-      leaveSummary.push({
-        leaveType: "UNPAID",
-        label: "Unpaid / LWP",
-        totalAvailable: 0,
-        taken: parseFloat(unpaidTaken.toFixed(2)),
-        balance: 0,
-      });
-    }
-
-    // 5. Total Annual Quota
+    // Always include Total Annual Quota card
+    const totalBalance = parseFloat(Math.max(0, totalPaidQuota - totalPaidTaken).toFixed(2));
     leaveSummary.push({
       leaveType: "TOTAL",
       label: "Total Annual Quota",
-      totalAvailable: totalPaidQuota,
-      taken: totalPaidTaken,
+      totalAvailable: parseFloat(totalPaidQuota.toFixed(2)),
+      taken: parseFloat(totalPaidTaken.toFixed(2)),
       balance: totalBalance,
     });
 
@@ -217,6 +223,7 @@ export async function GET(request: Request) {
       leaves: filteredLeaves,
       stats,
       leaveSummary,
+      configuredLeaveTypes,
     });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
@@ -376,16 +383,69 @@ export async function POST(request: Request) {
       finalDaysCount = daysCount ? parseFloat(daysCount) : Math.max(1, diffDays);
     }
 
+    // Fetch leave types configuration to verify balance
+    const configSetting = await prisma.systemSetting.findUnique({
+      where: { key: "LEAVE_TYPES_CONFIG" },
+    });
+    let leaveTypesList: any[] = [
+      { id: "EARNED", name: "Earned Leave (EL)", annualDays: 18, isPaid: true },
+      { id: "CASUAL", name: "Casual Leave (CL)", annualDays: 0, isPaid: true },
+      { id: "SICK", name: "Sick Leave (SL)", annualDays: 0, isPaid: true },
+      { id: "UNPAID", name: "Unpaid Leave (LWP)", annualDays: 0, isPaid: false },
+    ];
+    if (configSetting?.value) {
+      try {
+        leaveTypesList = JSON.parse(configSetting.value);
+      } catch (e) {}
+    }
+
+    const typeIdUpper = String(leaveType).toUpperCase();
+    const matchingType = leaveTypesList.find(
+      (t: any) => String(t.id).toUpperCase() === typeIdUpper
+    );
+
+    let autoConvertedToUnpaid = false;
+    let finalLeaveType = leaveType;
+    let finalReason = reason.trim();
+    let remainingPaidBalance = 0;
+
+    // Check if employee has 0 balance for a paid leave type
+    if (typeIdUpper !== "UNPAID") {
+      const annualQuota = matchingType ? parseFloat(matchingType.annualDays) || 0 : 0;
+      const isPaidType = matchingType ? matchingType.isPaid !== false : true;
+
+      if (isPaidType) {
+        const approvedForType = await prisma.leaveRequest.findMany({
+          where: {
+            userId,
+            status: "APPROVED",
+            OR: [
+              { leaveType: typeIdUpper },
+              ...(typeIdUpper === "CASUAL" ? [{ leaveType: "HALF_DAY" }, { leaveType: "HOURLY" }] : []),
+            ],
+          },
+        });
+        const taken = approvedForType.reduce((acc, l) => acc + (l.daysCount || 1), 0);
+        remainingPaidBalance = Math.max(0, annualQuota - taken);
+
+        if (remainingPaidBalance <= 0) {
+          autoConvertedToUnpaid = true;
+          finalLeaveType = "UNPAID";
+          finalReason = `${finalReason} (Auto-applied as Unpaid Leave: Available balance was 0)`;
+        }
+      }
+    }
+
     const leave = await prisma.leaveRequest.create({
       data: {
         userId,
-        leaveType,
+        leaveType: finalLeaveType,
         startDate,
         endDate,
         daysCount: finalDaysCount,
         durationHours: finalHours,
         isHourly: !!(isHourly || leaveType === "HOURLY"),
-        reason: reason.trim(),
+        reason: finalReason,
         status: "PENDING",
       },
       include: {
@@ -400,7 +460,14 @@ export async function POST(request: Request) {
       },
     });
 
-    return NextResponse.json({ success: true, leave });
+    return NextResponse.json({
+      success: true,
+      leave,
+      autoConvertedToUnpaid,
+      message: autoConvertedToUnpaid
+        ? "Leave application submitted. Because your available paid leave balance was 0, it was automatically applied as Unpaid Leave (LWP)."
+        : "Leave application submitted successfully.",
+    });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }

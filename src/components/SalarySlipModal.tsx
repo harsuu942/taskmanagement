@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo, useRef } from "react";
-import { User } from "@/types";
+import { User, SalaryComponentsConfig } from "@/types";
 import {
   FileText,
   X,
@@ -118,9 +118,23 @@ export default function SalarySlipModal({
   const [lwpOverride, setLwpOverride] = useState<number | null>(null);
   const [pfOverride, setPfOverride] = useState<number | null>(null);
   const [ptOverride, setPtOverride] = useState<number | null>(null);
+  const [componentOverrides, setComponentOverrides] = useState<{ [id: string]: number | null }>({});
   const [showComponentConfig, setShowComponentConfig] = useState(true);
 
-  // Dynamic system defaults for salary components
+  // Dynamic system defaults and components config for salary slip
+  const [salaryConfig, setSalaryConfig] = useState<SalaryComponentsConfig>({
+    earnings: [
+      { id: "basic", name: "Basic Salary", type: "PERCENT_CTC", value: 50, isDefault: true },
+      { id: "hra", name: "House Rent Allowance (HRA)", type: "PERCENT_CTC", value: 30, isDefault: true },
+      { id: "special", name: "Special Allowance", type: "PERCENT_CTC", value: 20, isDefault: true },
+    ],
+    deductions: [
+      { id: "pf", name: "Provident Fund (PF)", type: "PERCENT_BASIC", value: 12, threshold: 15000, isDefault: true },
+      { id: "pt", name: "Professional Tax (PT)", type: "FIXED", value: 200, threshold: 15000, isDefault: true },
+    ],
+    otMultiplier: 1.5,
+  });
+
   const [systemDefaults, setSystemDefaults] = useState({
     basicPercent: 50,
     hraPercent: 30,
@@ -136,6 +150,9 @@ export default function SalarySlipModal({
       .then((r) => r.json())
       .then((data) => {
         if (data.settings) {
+          if (data.settings.salaryComponentsConfig) {
+            setSalaryConfig(data.settings.salaryComponentsConfig);
+          }
           setSystemDefaults({
             basicPercent: data.settings.defaultBasicPercent ?? 50,
             hraPercent: data.settings.defaultHraPercent ?? 30,
@@ -157,6 +174,7 @@ export default function SalarySlipModal({
     setLwpOverride(null);
     setPfOverride(null);
     setPtOverride(null);
+    setComponentOverrides({});
     setOtherDeductions(0);
     setBonusAmount(0);
   };
@@ -279,14 +297,14 @@ export default function SalarySlipModal({
     return Math.max(1, totalDaysInMonth - sundays - publicHolidays);
   }, [selectedYear, selectedMonth, totalDaysInMonth, publicHolidays]);
 
-  // Salary Calculations with Component Overrides
+  const formatINR = (val: number) =>
+    "₹" + Number(val || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+  // Salary Calculations with Dynamic Component Overrides
   const calculations = useMemo(() => {
     const grossBase = Number(monthlySalaryInput) || 0;
-    const defaultBasic = Math.round(grossBase * (systemDefaults.basicPercent / 100));
-    const defaultHra = Math.round(grossBase * (systemDefaults.hraPercent / 100));
-    const defaultSpecial = Math.round(grossBase * (systemDefaults.specialPercent / 100));
 
-    // Hourly Rate for OT: either from input or calculated pro-rata
+    // Effective Hourly Rate for OT
     const effectiveHourlyRate =
       hourlyRateInput > 0
         ? hourlyRateInput
@@ -294,36 +312,213 @@ export default function SalarySlipModal({
         ? grossBase / (workingDays * 8)
         : 150;
 
-    const defaultOtPay = Math.round(overtimeHours * effectiveHourlyRate * systemDefaults.otMultiplier);
-
-    const basic = basicOverride !== null ? basicOverride : defaultBasic;
-    const hra = hraOverride !== null ? hraOverride : defaultHra;
-    const special = specialOverride !== null ? specialOverride : defaultSpecial;
+    const otMultiplier = salaryConfig.otMultiplier || systemDefaults.otMultiplier || 1.5;
+    const defaultOtPay = Math.round(overtimeHours * effectiveHourlyRate * otMultiplier);
     const otPay = otPayOverride !== null ? otPayOverride : defaultOtPay;
     const bonus = Number(bonusAmount || 0);
 
-    const totalGrossEarnings = basic + hra + special + otPay + bonus;
+    // Dynamic Earnings calculation
+    const computedEarningsList: Array<{
+      id: string;
+      name: string;
+      type?: string;
+      amount: number;
+      defaultAmount: number;
+      isCustom: boolean;
+    }> = [];
 
-    // Deductions
+    const configuredEarnings = (salaryConfig.earnings && salaryConfig.earnings.length > 0)
+      ? salaryConfig.earnings
+      : [
+          { id: "basic", name: "Basic Salary", type: "PERCENT_CTC" as const, value: 50, isDefault: true },
+          { id: "hra", name: "House Rent Allowance (HRA)", type: "PERCENT_CTC" as const, value: 30, isDefault: true },
+          { id: "special", name: "Special Allowance", type: "PERCENT_CTC" as const, value: 20, isDefault: true },
+        ];
+
+    let computedBasic = 0;
+    let defaultBasic = 0;
+    let defaultHra = 0;
+    let defaultSpecial = 0;
+    let basicVal = 0;
+    let hraVal = 0;
+    let specialVal = 0;
+
+    configuredEarnings.forEach((e) => {
+      let override = componentOverrides[e.id] ?? null;
+      if (e.id === "basic" && basicOverride !== null) override = basicOverride;
+      if (e.id === "hra" && hraOverride !== null) override = hraOverride;
+      if (e.id === "special" && specialOverride !== null) override = specialOverride;
+
+      const def = e.type === "PERCENT_CTC"
+        ? Math.round(grossBase * (e.value / 100))
+        : Math.round(e.value);
+
+      const finalAmt = override !== null ? override : def;
+
+      if (e.id === "basic") {
+        defaultBasic = def;
+        basicVal = finalAmt;
+        computedBasic = finalAmt;
+      } else if (e.id === "hra") {
+        defaultHra = def;
+        hraVal = finalAmt;
+      } else if (e.id === "special") {
+        defaultSpecial = def;
+        specialVal = finalAmt;
+      }
+
+      computedEarningsList.push({
+        id: e.id,
+        name: e.name + (e.type === "PERCENT_CTC" ? ` (${e.value}%)` : ""),
+        type: e.type,
+        amount: Math.round(finalAmt),
+        defaultAmount: Math.round(def),
+        isCustom: override !== null,
+      });
+    });
+
+    if (computedBasic === 0) {
+      computedBasic = basicVal || Math.round(grossBase * 0.5);
+    }
+
+    // Overtime pay in earnings
+    computedEarningsList.push({
+      id: "overtime",
+      name: `Overtime Pay (${overtimeHours} hrs @ ${formatINR(Math.round(effectiveHourlyRate * otMultiplier))}/hr)`,
+      amount: Math.round(otPay),
+      defaultAmount: Math.round(defaultOtPay),
+      isCustom: otPayOverride !== null,
+    });
+
+    // Bonus if applicable
+    if (bonus > 0) {
+      computedEarningsList.push({
+        id: "bonus",
+        name: "Performance / Festival Bonus",
+        amount: Math.round(bonus),
+        defaultAmount: 0,
+        isCustom: true,
+      });
+    }
+
+    const totalGrossEarnings = computedEarningsList.reduce((sum, item) => sum + item.amount, 0);
+
+    // Deductions calculation
     const perDaySalary = totalDaysInMonth > 0 ? grossBase / totalDaysInMonth : 0;
     const defaultLwp = Math.round(unpaidLeaves * perDaySalary);
-    const defaultPf = basic >= 15000 ? Math.round(basic * (systemDefaults.pfPercent / 100)) : 0;
-    const defaultPt = grossBase >= 15000 ? systemDefaults.ptAmount : 0;
-
     const lwpDeduction = lwpOverride !== null ? lwpOverride : defaultLwp;
-    const pfDeduction = pfOverride !== null ? pfOverride : defaultPf;
-    const ptDeduction = ptOverride !== null ? ptOverride : defaultPt;
-    const other = Number(otherDeductions || 0);
 
-    const totalDeductionsCalc = lwpDeduction + pfDeduction + ptDeduction + other;
+    const computedDeductionsList: Array<{
+      id: string;
+      name: string;
+      type?: string;
+      amount: number;
+      defaultAmount: number;
+      isCustom: boolean;
+    }> = [
+      {
+        id: "lwp",
+        name: `Loss of Pay (LWP - ${unpaidLeaves} day(s))`,
+        amount: Math.round(lwpDeduction),
+        defaultAmount: Math.round(defaultLwp),
+        isCustom: lwpOverride !== null,
+      },
+    ];
+
+    const configuredDeductions = (salaryConfig.deductions && salaryConfig.deductions.length > 0)
+      ? salaryConfig.deductions
+      : [
+          { id: "pf", name: "Provident Fund (PF)", type: "PERCENT_BASIC" as const, value: 12, threshold: 15000, isDefault: true },
+          { id: "pt", name: "Professional Tax (PT)", type: "FIXED" as const, value: 200, threshold: 15000, isDefault: true },
+        ];
+
+    let defaultPf = 0;
+    let defaultPt = 0;
+    let pfVal = 0;
+    let ptVal = 0;
+
+    configuredDeductions.forEach((d) => {
+      let override = componentOverrides[d.id] ?? null;
+      if (d.id === "pf" && pfOverride !== null) override = pfOverride;
+      if (d.id === "pt" && ptOverride !== null) override = ptOverride;
+
+      let def = 0;
+      const baseVal = d.type === "PERCENT_BASIC" ? computedBasic : grossBase;
+      if (!d.threshold || baseVal >= d.threshold) {
+        if (d.type === "PERCENT_BASIC") {
+          def = Math.round(computedBasic * (d.value / 100));
+        } else if (d.type === "PERCENT_CTC") {
+          def = Math.round(grossBase * (d.value / 100));
+        } else {
+          def = Math.round(d.value);
+        }
+      }
+
+      const finalAmt = override !== null ? override : def;
+
+      if (d.id === "pf") {
+        defaultPf = def;
+        pfVal = finalAmt;
+      } else if (d.id === "pt") {
+        defaultPt = def;
+        ptVal = finalAmt;
+      }
+
+      computedDeductionsList.push({
+        id: d.id,
+        name: d.name,
+        type: d.type,
+        amount: Math.round(finalAmt),
+        defaultAmount: Math.round(def),
+        isCustom: override !== null,
+      });
+    });
+
+    const other = Number(otherDeductions || 0);
+    if (other > 0) {
+      computedDeductionsList.push({
+        id: "other",
+        name: "Other Deductions",
+        amount: Math.round(other),
+        defaultAmount: 0,
+        isCustom: true,
+      });
+    }
+
+    const totalDeductionsCalc = computedDeductionsList.reduce((sum, item) => sum + item.amount, 0);
     const netSalaryCalc = Math.max(0, totalGrossEarnings - totalDeductionsCalc);
 
+    // Paired rows for synchronized dual-column table rendering
+    const maxRows = Math.max(computedEarningsList.length, computedDeductionsList.length);
+    const pairedRows: Array<{
+      earning: typeof computedEarningsList[0] | null;
+      deduction: typeof computedDeductionsList[0] | null;
+    }> = [];
+    for (let i = 0; i < maxRows; i++) {
+      pairedRows.push({
+        earning: computedEarningsList[i] || null,
+        deduction: computedDeductionsList[i] || null,
+      });
+    }
+
+    const hasAnyOverride =
+      basicOverride !== null ||
+      hraOverride !== null ||
+      specialOverride !== null ||
+      otPayOverride !== null ||
+      lwpOverride !== null ||
+      pfOverride !== null ||
+      ptOverride !== null ||
+      Object.values(componentOverrides).some((v) => v !== null) ||
+      otherDeductions > 0 ||
+      bonusAmount > 0;
+
     return {
-      basicSalary: Math.round(basic),
+      basicSalary: Math.round(basicVal || computedBasic),
       defaultBasic,
-      hra: Math.round(hra),
+      hra: Math.round(hraVal),
       defaultHra,
-      specialAllowance: Math.round(special),
+      specialAllowance: Math.round(specialVal),
       defaultSpecial,
       overtimePay: Math.round(otPay),
       defaultOtPay,
@@ -331,25 +526,19 @@ export default function SalarySlipModal({
       grossEarnings: Math.round(totalGrossEarnings),
       unpaidDeduction: Math.round(lwpDeduction),
       defaultLwp,
-      pfDeduction: Math.round(pfDeduction),
+      pfDeduction: Math.round(pfVal),
       defaultPf,
-      ptDeduction: Math.round(ptDeduction),
+      ptDeduction: Math.round(ptVal),
       defaultPt,
       otherDeductions: Math.round(other),
       totalDeductions: Math.round(totalDeductionsCalc),
       netSalary: Math.round(netSalaryCalc),
       netSalaryInWords: numberToWords(Math.round(netSalaryCalc)),
       effectiveHourlyRate: Math.round(effectiveHourlyRate),
-      hasCustomComponents:
-        basicOverride !== null ||
-        hraOverride !== null ||
-        specialOverride !== null ||
-        otPayOverride !== null ||
-        lwpOverride !== null ||
-        pfOverride !== null ||
-        ptOverride !== null ||
-        otherDeductions > 0 ||
-        bonusAmount > 0,
+      computedEarningsList,
+      computedDeductionsList,
+      pairedRows,
+      hasCustomComponents: hasAnyOverride,
     };
   }, [
     monthlySalaryInput,
@@ -367,13 +556,12 @@ export default function SalarySlipModal({
     lwpOverride,
     pfOverride,
     ptOverride,
+    componentOverrides,
+    salaryConfig,
     systemDefaults,
   ]);
 
   const monthYearString = `${months[selectedMonth]} ${selectedYear}`;
-
-  const formatINR = (val: number) =>
-    "₹" + Number(val || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
   // Print Handler
   const handlePrint = () => {
@@ -633,48 +821,47 @@ export default function SalarySlipModal({
                   </div>
 
                   <div className="grid grid-cols-2 gap-2 text-xs">
-                    <div>
-                      <label className="block text-[10px] text-slate-600 font-semibold mb-0.5">
-                        Basic Salary (₹)
-                      </label>
-                      <input
-                        type="number"
-                        placeholder={`Auto: ${calculations.defaultBasic}`}
-                        value={basicOverride !== null ? basicOverride : ""}
-                        onChange={(e) =>
-                          setBasicOverride(e.target.value === "" ? null : parseFloat(e.target.value) || 0)
-                        }
-                        className="w-full px-2 py-1 border border-slate-300 rounded text-xs bg-white font-bold"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[10px] text-slate-600 font-semibold mb-0.5">
-                        HRA (₹)
-                      </label>
-                      <input
-                        type="number"
-                        placeholder={`Auto: ${calculations.defaultHra}`}
-                        value={hraOverride !== null ? hraOverride : ""}
-                        onChange={(e) =>
-                          setHraOverride(e.target.value === "" ? null : parseFloat(e.target.value) || 0)
-                        }
-                        className="w-full px-2 py-1 border border-slate-300 rounded text-xs bg-white font-bold"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[10px] text-slate-600 font-semibold mb-0.5">
-                        Special / Conveyance (₹)
-                      </label>
-                      <input
-                        type="number"
-                        placeholder={`Auto: ${calculations.defaultSpecial}`}
-                        value={specialOverride !== null ? specialOverride : ""}
-                        onChange={(e) =>
-                          setSpecialOverride(e.target.value === "" ? null : parseFloat(e.target.value) || 0)
-                        }
-                        className="w-full px-2 py-1 border border-slate-300 rounded text-xs bg-white font-bold"
-                      />
-                    </div>
+                    {(salaryConfig.earnings && salaryConfig.earnings.length > 0 ? salaryConfig.earnings : [
+                      { id: "basic", name: "Basic Salary", type: "PERCENT_CTC" as const, value: 50 },
+                      { id: "hra", name: "House Rent Allowance (HRA)", type: "PERCENT_CTC" as const, value: 30 },
+                      { id: "special", name: "Special Allowance", type: "PERCENT_CTC" as const, value: 20 },
+                    ]).map((e) => {
+                      const currentVal =
+                        e.id === "basic"
+                          ? basicOverride
+                          : e.id === "hra"
+                          ? hraOverride
+                          : e.id === "special"
+                          ? specialOverride
+                          : componentOverrides[e.id] ?? null;
+
+                      const defVal =
+                        e.type === "PERCENT_CTC"
+                          ? Math.round((Number(monthlySalaryInput) || 0) * (e.value / 100))
+                          : Math.round(e.value);
+
+                      return (
+                        <div key={e.id}>
+                          <label className="block text-[10px] text-slate-600 font-semibold mb-0.5 truncate" title={e.name}>
+                            {e.name} ({e.type === "PERCENT_CTC" ? `${e.value}%` : "₹"})
+                          </label>
+                          <input
+                            type="number"
+                            placeholder={`Auto: ${defVal}`}
+                            value={currentVal !== null ? currentVal : ""}
+                            onChange={(ev) => {
+                              const val = ev.target.value === "" ? null : parseFloat(ev.target.value) || 0;
+                              if (e.id === "basic") setBasicOverride(val);
+                              else if (e.id === "hra") setHraOverride(val);
+                              else if (e.id === "special") setSpecialOverride(val);
+                              else setComponentOverrides((prev) => ({ ...prev, [e.id]: val }));
+                            }}
+                            className="w-full px-2 py-1 border border-slate-300 rounded text-xs bg-white font-bold"
+                          />
+                        </div>
+                      );
+                    })}
+
                     <div>
                       <label className="block text-[10px] text-slate-600 font-semibold mb-0.5">
                         Overtime Pay (₹)
@@ -689,9 +876,9 @@ export default function SalarySlipModal({
                         className="w-full px-2 py-1 border border-slate-300 rounded text-xs bg-white font-bold"
                       />
                     </div>
-                    <div className="col-span-2">
+                    <div>
                       <label className="block text-[10px] text-slate-600 font-semibold mb-0.5">
-                        Performance / Festival Bonus (₹)
+                        Bonus / Festival Pay (₹)
                       </label>
                       <input
                         type="number"
@@ -726,34 +913,51 @@ export default function SalarySlipModal({
                         className="w-full px-2 py-1 border border-slate-300 rounded text-xs bg-white font-bold text-rose-700"
                       />
                     </div>
-                    <div>
-                      <label className="block text-[10px] text-slate-600 font-semibold mb-0.5">
-                        Provident Fund (PF ₹)
-                      </label>
-                      <input
-                        type="number"
-                        placeholder={`Auto: ${calculations.defaultPf}`}
-                        value={pfOverride !== null ? pfOverride : ""}
-                        onChange={(e) =>
-                          setPfOverride(e.target.value === "" ? null : parseFloat(e.target.value) || 0)
+
+                    {(salaryConfig.deductions && salaryConfig.deductions.length > 0 ? salaryConfig.deductions : [
+                      { id: "pf", name: "Provident Fund (PF)", type: "PERCENT_BASIC" as const, value: 12, threshold: 15000 },
+                      { id: "pt", name: "Professional Tax (PT)", type: "FIXED" as const, value: 200, threshold: 15000 },
+                    ]).map((d) => {
+                      const currentVal =
+                        d.id === "pf"
+                          ? pfOverride
+                          : d.id === "pt"
+                          ? ptOverride
+                          : componentOverrides[d.id] ?? null;
+
+                      const baseVal = d.type === "PERCENT_BASIC" ? calculations.basicSalary : (Number(monthlySalaryInput) || 0);
+                      let defVal = 0;
+                      if (!d.threshold || baseVal >= d.threshold) {
+                        if (d.type === "PERCENT_BASIC") {
+                          defVal = Math.round(baseVal * (d.value / 100));
+                        } else if (d.type === "PERCENT_CTC") {
+                          defVal = Math.round(baseVal * (d.value / 100));
+                        } else {
+                          defVal = Math.round(d.value);
                         }
-                        className="w-full px-2 py-1 border border-slate-300 rounded text-xs bg-white font-bold text-rose-700"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[10px] text-slate-600 font-semibold mb-0.5">
-                        Professional Tax / TDS (₹)
-                      </label>
-                      <input
-                        type="number"
-                        placeholder={`Auto: ${calculations.defaultPt}`}
-                        value={ptOverride !== null ? ptOverride : ""}
-                        onChange={(e) =>
-                          setPtOverride(e.target.value === "" ? null : parseFloat(e.target.value) || 0)
-                        }
-                        className="w-full px-2 py-1 border border-slate-300 rounded text-xs bg-white font-bold text-rose-700"
-                      />
-                    </div>
+                      }
+
+                      return (
+                        <div key={d.id}>
+                          <label className="block text-[10px] text-slate-600 font-semibold mb-0.5 truncate" title={d.name}>
+                            {d.name} {d.type === "PERCENT_BASIC" ? `(${d.value}% Basic)` : d.type === "PERCENT_CTC" ? `(${d.value}% CTC)` : "(₹)"}
+                          </label>
+                          <input
+                            type="number"
+                            placeholder={`Auto: ${defVal}`}
+                            value={currentVal !== null ? currentVal : ""}
+                            onChange={(ev) => {
+                              const val = ev.target.value === "" ? null : parseFloat(ev.target.value) || 0;
+                              if (d.id === "pf") setPfOverride(val);
+                              else if (d.id === "pt") setPtOverride(val);
+                              else setComponentOverrides((prev) => ({ ...prev, [d.id]: val }));
+                            }}
+                            className="w-full px-2 py-1 border border-slate-300 rounded text-xs bg-white font-bold text-rose-700"
+                          />
+                        </div>
+                      );
+                    })}
+
                     <div>
                       <label className="block text-[10px] text-slate-600 font-semibold mb-0.5">
                         Other Deductions (₹)
@@ -952,70 +1156,24 @@ export default function SalarySlipModal({
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200">
-                <tr>
-                  <td className="py-2.5 px-4 font-semibold text-slate-800">Basic Salary (50%)</td>
-                  <td className="py-2.5 px-4 text-right font-bold text-slate-900">
-                    {formatINR(calculations.basicSalary)}
-                  </td>
-                  <td className="py-2.5 px-4 font-semibold text-slate-800 border-l border-slate-200">
-                    Loss of Pay (LWP - {unpaidLeaves} day(s))
-                  </td>
-                  <td className="py-2.5 px-4 text-right font-bold text-rose-600">
-                    {formatINR(calculations.unpaidDeduction)}
-                  </td>
-                </tr>
-
-                <tr>
-                  <td className="py-2.5 px-4 font-semibold text-slate-800">House Rent Allowance (HRA 30%)</td>
-                  <td className="py-2.5 px-4 text-right font-bold text-slate-900">
-                    {formatINR(calculations.hra)}
-                  </td>
-                  <td className="py-2.5 px-4 font-semibold text-slate-800 border-l border-slate-200">
-                    Provident Fund (PF)
-                  </td>
-                  <td className="py-2.5 px-4 text-right font-bold text-rose-600">
-                    {formatINR(calculations.pfDeduction)}
-                  </td>
-                </tr>
-
-                <tr>
-                  <td className="py-2.5 px-4 font-semibold text-slate-800">Special &amp; Conveyance Allowance (20%)</td>
-                  <td className="py-2.5 px-4 text-right font-bold text-slate-900">
-                    {formatINR(calculations.specialAllowance)}
-                  </td>
-                  <td className="py-2.5 px-4 font-semibold text-slate-800 border-l border-slate-200">
-                    Professional Tax / TDS
-                  </td>
-                  <td className="py-2.5 px-4 text-right font-bold text-rose-600">
-                    {formatINR(calculations.ptDeduction)}
-                  </td>
-                </tr>
-
-                <tr>
-                  <td className="py-2.5 px-4 font-semibold text-slate-800">
-                    Overtime Pay ({overtimeHours} hrs @ {formatINR(calculations.effectiveHourlyRate * 1.5)}/hr)
-                  </td>
-                  <td className="py-2.5 px-4 text-right font-bold text-amber-700">
-                    {formatINR(calculations.overtimePay)}
-                  </td>
-                  <td className="py-2.5 px-4 font-semibold text-slate-800 border-l border-slate-200">
-                    Other Deductions
-                  </td>
-                  <td className="py-2.5 px-4 text-right font-bold text-rose-600">
-                    {formatINR(calculations.otherDeductions)}
-                  </td>
-                </tr>
-
-                {bonusAmount > 0 && (
-                  <tr>
-                    <td className="py-2.5 px-4 font-semibold text-slate-800">Performance Bonus</td>
-                    <td className="py-2.5 px-4 text-right font-bold text-emerald-700">
-                      {formatINR(bonusAmount)}
+                {calculations.pairedRows.map((row, idx) => (
+                  <tr key={idx}>
+                    {/* Earnings Column */}
+                    <td className="py-2.5 px-4 font-semibold text-slate-800">
+                      {row.earning ? row.earning.name : "—"}
                     </td>
-                    <td className="py-2.5 px-4 border-l border-slate-200">—</td>
-                    <td className="py-2.5 px-4 text-right">—</td>
+                    <td className="py-2.5 px-4 text-right font-bold text-slate-900">
+                      {row.earning ? formatINR(row.earning.amount) : "—"}
+                    </td>
+                    {/* Deductions Column */}
+                    <td className="py-2.5 px-4 font-semibold text-slate-800 border-l border-slate-200">
+                      {row.deduction ? row.deduction.name : "—"}
+                    </td>
+                    <td className="py-2.5 px-4 text-right font-bold text-rose-600">
+                      {row.deduction ? formatINR(row.deduction.amount) : "—"}
+                    </td>
                   </tr>
-                )}
+                ))}
 
                 {/* Subtotals */}
                 <tr className="bg-slate-100 font-extrabold border-t-2 border-slate-300">

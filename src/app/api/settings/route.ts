@@ -39,6 +39,44 @@ export async function GET() {
     const defaultPtAmount = parseFloat(settingsMap["DEFAULT_PT_AMOUNT"] || "200");
     const defaultOtMultiplier = parseFloat(settingsMap["DEFAULT_OT_MULTIPLIER"] || "1.5");
 
+    // Dynamic Salary Components Config (Custom Names & Custom Components)
+    let salaryComponentsConfig = null;
+    if (settingsMap["SALARY_COMPONENTS_CONFIG"]) {
+      try {
+        salaryComponentsConfig = JSON.parse(settingsMap["SALARY_COMPONENTS_CONFIG"]);
+      } catch (e) {}
+    }
+    if (!salaryComponentsConfig || !Array.isArray(salaryComponentsConfig.earnings)) {
+      salaryComponentsConfig = {
+        earnings: [
+          { id: "basic", name: "Basic Salary", type: "PERCENT_CTC", value: defaultBasicPercent, isDefault: true },
+          { id: "hra", name: "House Rent Allowance (HRA)", type: "PERCENT_CTC", value: defaultHraPercent, isDefault: true },
+          { id: "special", name: "Special Allowance", type: "PERCENT_CTC", value: defaultSpecialPercent, isDefault: true },
+        ],
+        deductions: [
+          { id: "pf", name: "Provident Fund (PF)", type: "PERCENT_BASIC", value: defaultPfPercent, threshold: 15000, isDefault: true },
+          { id: "pt", name: "Professional Tax (PT)", type: "FIXED", value: defaultPtAmount, threshold: 15000, isDefault: true },
+        ],
+        otMultiplier: defaultOtMultiplier,
+      };
+    }
+
+    // Dynamic Leave Types Config (Custom Names & Custom Leave Types)
+    let leaveTypesConfig = null;
+    if (settingsMap["LEAVE_TYPES_CONFIG"]) {
+      try {
+        leaveTypesConfig = JSON.parse(settingsMap["LEAVE_TYPES_CONFIG"]);
+      } catch (e) {}
+    }
+    if (!leaveTypesConfig || !Array.isArray(leaveTypesConfig) || leaveTypesConfig.length === 0) {
+      leaveTypesConfig = [
+        { id: "EARNED", name: "Earned Leave (EL)", annualDays: earnedDays, accrualRate: earnedLeaveAccrual, isPaid: true, isDefault: true },
+        { id: "CASUAL", name: "Casual Leave (CL)", annualDays: casualDays, accrualRate: 0, isPaid: true, isDefault: true },
+        { id: "SICK", name: "Sick Leave (SL)", annualDays: sickDays, accrualRate: 0, isPaid: true, isDefault: true },
+        { id: "UNPAID", name: "Unpaid Leave (LWP)", annualDays: 0, accrualRate: 0, isPaid: false, isDefault: true },
+      ];
+    }
+
     return NextResponse.json({
       settings: {
         adminEmail,
@@ -61,6 +99,8 @@ export async function GET() {
         defaultPfPercent,
         defaultPtAmount,
         defaultOtMultiplier,
+        salaryComponentsConfig,
+        leaveTypesConfig,
       },
     });
   } catch (error: any) {
@@ -92,6 +132,8 @@ export async function POST(request: Request) {
       defaultPfPercent,
       defaultPtAmount,
       defaultOtMultiplier,
+      salaryComponentsConfig,
+      leaveTypesConfig,
     } = body;
 
     // Optional Action: Test Gmail SMTP Connection
@@ -265,6 +307,126 @@ export async function POST(request: Request) {
         where: { key: "DEFAULT_OT_MULTIPLIER" },
         create: { key: "DEFAULT_OT_MULTIPLIER", value: String(defaultOtMultiplier) },
         update: { value: String(defaultOtMultiplier) },
+      });
+    }
+
+    if (salaryComponentsConfig !== undefined) {
+      await prisma.systemSetting.upsert({
+        where: { key: "SALARY_COMPONENTS_CONFIG" },
+        create: { key: "SALARY_COMPONENTS_CONFIG", value: JSON.stringify(salaryComponentsConfig) },
+        update: { value: JSON.stringify(salaryComponentsConfig) },
+      });
+
+      // Synchronize backward-compatible keys if earnings/deductions provided
+      if (Array.isArray(salaryComponentsConfig.earnings)) {
+        const basic = salaryComponentsConfig.earnings.find((e: any) => e.id === "basic")?.value;
+        const hra = salaryComponentsConfig.earnings.find((e: any) => e.id === "hra")?.value;
+        const special = salaryComponentsConfig.earnings.find((e: any) => e.id === "special")?.value;
+        if (basic !== undefined) {
+          await prisma.systemSetting.upsert({
+            where: { key: "DEFAULT_BASIC_PERCENT" },
+            create: { key: "DEFAULT_BASIC_PERCENT", value: String(basic) },
+            update: { value: String(basic) },
+          });
+        }
+        if (hra !== undefined) {
+          await prisma.systemSetting.upsert({
+            where: { key: "DEFAULT_HRA_PERCENT" },
+            create: { key: "DEFAULT_HRA_PERCENT", value: String(hra) },
+            update: { value: String(hra) },
+          });
+        }
+        if (special !== undefined) {
+          await prisma.systemSetting.upsert({
+            where: { key: "DEFAULT_SPECIAL_PERCENT" },
+            create: { key: "DEFAULT_SPECIAL_PERCENT", value: String(special) },
+            update: { value: String(special) },
+          });
+        }
+      }
+      if (Array.isArray(salaryComponentsConfig.deductions)) {
+        const pf = salaryComponentsConfig.deductions.find((d: any) => d.id === "pf")?.value;
+        const pt = salaryComponentsConfig.deductions.find((d: any) => d.id === "pt")?.value;
+        if (pf !== undefined) {
+          await prisma.systemSetting.upsert({
+            where: { key: "DEFAULT_PF_PERCENT" },
+            create: { key: "DEFAULT_PF_PERCENT", value: String(pf) },
+            update: { value: String(pf) },
+          });
+        }
+        if (pt !== undefined) {
+          await prisma.systemSetting.upsert({
+            where: { key: "DEFAULT_PT_AMOUNT" },
+            create: { key: "DEFAULT_PT_AMOUNT", value: String(pt) },
+            update: { value: String(pt) },
+          });
+        }
+      }
+      if (salaryComponentsConfig.otMultiplier !== undefined) {
+        await prisma.systemSetting.upsert({
+          where: { key: "DEFAULT_OT_MULTIPLIER" },
+          create: { key: "DEFAULT_OT_MULTIPLIER", value: String(salaryComponentsConfig.otMultiplier) },
+          update: { value: String(salaryComponentsConfig.otMultiplier) },
+        });
+      }
+    }
+
+    if (leaveTypesConfig !== undefined && Array.isArray(leaveTypesConfig)) {
+      await prisma.systemSetting.upsert({
+        where: { key: "LEAVE_TYPES_CONFIG" },
+        create: { key: "LEAVE_TYPES_CONFIG", value: JSON.stringify(leaveTypesConfig) },
+        update: { value: JSON.stringify(leaveTypesConfig) },
+      });
+
+      // Synchronize backward-compatible keys
+      const earned = leaveTypesConfig.find((t: any) => t.id === "EARNED");
+      const casual = leaveTypesConfig.find((t: any) => t.id === "CASUAL");
+      const sick = leaveTypesConfig.find((t: any) => t.id === "SICK");
+      const unpaid = leaveTypesConfig.find((t: any) => t.id === "UNPAID");
+
+      if (earned) {
+        await prisma.systemSetting.upsert({
+          where: { key: "EARNED_LEAVE_DAYS" },
+          create: { key: "EARNED_LEAVE_DAYS", value: String(earned.annualDays) },
+          update: { value: String(earned.annualDays) },
+        });
+        if (earned.accrualRate !== undefined) {
+          await prisma.systemSetting.upsert({
+            where: { key: "EARNED_LEAVE_ACCRUAL" },
+            create: { key: "EARNED_LEAVE_ACCRUAL", value: String(earned.accrualRate) },
+            update: { value: String(earned.accrualRate) },
+          });
+        }
+      }
+      if (casual) {
+        await prisma.systemSetting.upsert({
+          where: { key: "CASUAL_LEAVE_DAYS" },
+          create: { key: "CASUAL_LEAVE_DAYS", value: String(casual.annualDays) },
+          update: { value: String(casual.annualDays) },
+        });
+      }
+      if (sick) {
+        await prisma.systemSetting.upsert({
+          where: { key: "SICK_LEAVE_DAYS" },
+          create: { key: "SICK_LEAVE_DAYS", value: String(sick.annualDays) },
+          update: { value: String(sick.annualDays) },
+        });
+      }
+      if (unpaid) {
+        await prisma.systemSetting.upsert({
+          where: { key: "UNPAID_LEAVE_ENABLED" },
+          create: { key: "UNPAID_LEAVE_ENABLED", value: String(unpaid.annualDays > 0 || unpaid.isPaid === false) },
+          update: { value: String(unpaid.annualDays > 0 || unpaid.isPaid === false) },
+        });
+      }
+
+      const totalPaid = leaveTypesConfig
+        .filter((t: any) => t.isPaid)
+        .reduce((sum: number, t: any) => sum + (parseFloat(t.annualDays) || 0), 0);
+      await prisma.systemSetting.upsert({
+        where: { key: "ANNUAL_LEAVE_QUOTA" },
+        create: { key: "ANNUAL_LEAVE_QUOTA", value: String(totalPaid) },
+        update: { value: String(totalPaid) },
       });
     }
 
