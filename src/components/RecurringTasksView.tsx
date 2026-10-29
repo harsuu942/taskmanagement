@@ -70,6 +70,52 @@ export default function RecurringTasksView({
     }
   };
 
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkDeleting, setBulkDeleting] = useState(false);
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === filteredTemplates.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(filteredTemplates.map((t) => t.id)));
+    }
+  };
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedIds.size === 0) return;
+    if (!confirm(`Are you sure you want to delete ${selectedIds.size} selected recurring template(s)?`)) return;
+
+    setBulkDeleting(true);
+    try {
+      const res = await fetch("/api/tasks", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          taskIds: Array.from(selectedIds),
+          userId: currentUser?.id,
+          role: currentUser?.role,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) alert(data.error || "Failed to delete templates");
+      setSelectedIds(new Set());
+      await fetchTemplates();
+    } catch (e: any) {
+      alert(e.message || "Failed to delete templates");
+    } finally {
+      setBulkDeleting(false);
+    }
+  };
+
   const handleDeleteTemplate = async (templateId: string, title: string) => {
     if (!confirm(`Are you sure you want to delete the recurring template "${title}"? Future automatic task generation for this schedule will be stopped.`)) {
       return;
@@ -311,6 +357,15 @@ export default function RecurringTasksView({
           <table className="w-full text-left text-xs">
             <thead>
               <tr className="bg-slate-100 text-slate-600 font-bold border-b border-slate-200 uppercase tracking-wider text-[11px]">
+                <th className="py-3 px-3 w-10 text-center">
+                  <input
+                    type="checkbox"
+                    checked={filteredTemplates.length > 0 && selectedIds.size === filteredTemplates.length}
+                    onChange={toggleSelectAll}
+                    className="rounded border-slate-300 text-purple-600 focus:ring-purple-500 cursor-pointer"
+                    title="Select / deselect all templates"
+                  />
+                </th>
                 <th className="py-3 px-4">Template Title & Client</th>
                 <th className="py-3 px-4">Frequency</th>
                 <th className="py-3 px-4">Schedule / Rule</th>
@@ -323,7 +378,7 @@ export default function RecurringTasksView({
             <tbody className="divide-y divide-slate-200">
               {filteredTemplates.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="py-12 text-center text-slate-400">
+                  <td colSpan={8} className="py-12 text-center text-slate-400">
                     {isAdmin
                       ? "No recurring templates match your search filter. Click \"+ Add Schedule\" to configure one."
                       : "No recurring task schedules found for you. Click \"+ Add Schedule\" to create a recurring task."}
@@ -331,7 +386,15 @@ export default function RecurringTasksView({
                 </tr>
               ) : (
                 filteredTemplates.map((tpl) => (
-                  <tr key={tpl.id} className="hover:bg-slate-50 transition">
+                  <tr key={tpl.id} className={`hover:bg-slate-50 transition ${selectedIds.has(tpl.id) ? "bg-purple-50/50" : ""}`}>
+                    <td className="py-3.5 px-3 text-center">
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.has(tpl.id)}
+                        onChange={() => toggleSelect(tpl.id)}
+                        className="rounded border-slate-300 text-purple-600 focus:ring-purple-500 cursor-pointer"
+                      />
+                    </td>
                     <td className="py-3.5 px-4 font-semibold text-slate-800">
                       <div className="font-extrabold text-slate-900 text-xs">{tpl.title}</div>
                       <div className="flex items-center space-x-2 mt-0.5">
@@ -470,6 +533,30 @@ export default function RecurringTasksView({
           </table>
         </div>
       </div>
+
+      {/* Floating Bulk Action Bar */}
+      {selectedIds.size > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 bg-slate-900 text-white px-5 py-3 rounded-2xl shadow-2xl border border-slate-700 flex items-center space-x-4 animate-in slide-in-from-bottom-3 duration-200">
+          <span className="text-xs font-bold text-slate-200">
+            ✓ {selectedIds.size} recurring template{selectedIds.size > 1 ? "s" : ""} selected
+          </span>
+          <div className="h-4 w-px bg-slate-700" />
+          <button
+            disabled={bulkDeleting}
+            onClick={handleBulkDelete}
+            className="flex items-center space-x-1.5 px-3 py-1.5 bg-rose-600 hover:bg-rose-700 disabled:opacity-50 text-white text-xs font-bold rounded-xl transition shadow-xs cursor-pointer"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+            <span>{bulkDeleting ? "Deleting..." : `Delete Selected (${selectedIds.size})`}</span>
+          </button>
+          <button
+            onClick={() => setSelectedIds(new Set())}
+            className="text-xs text-slate-400 hover:text-white font-medium cursor-pointer"
+          >
+            Clear
+          </button>
+        </div>
+      )}
     </div>
   );
 }

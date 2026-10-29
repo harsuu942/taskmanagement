@@ -21,6 +21,10 @@ export async function GET() {
       !gmailUser.includes("example.com")
     );
 
+    const companyDailyHours = parseFloat(settingsMap["COMPANY_DAILY_HOURS"] || "8");
+    const enableSundayOt = settingsMap["ENABLE_SUNDAY_OT"] !== "false";
+    const standardWorkDays = parseInt(settingsMap["STANDARD_WORK_DAYS"] || "26");
+
     return NextResponse.json({
       settings: {
         adminEmail,
@@ -28,6 +32,9 @@ export async function GET() {
         gmailAppPassword,
         hasPassword,
         gmailConfigured,
+        companyDailyHours,
+        enableSundayOt,
+        standardWorkDays,
       },
     });
   } catch (error: any) {
@@ -38,7 +45,16 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { action, adminEmail, gmailUser, gmailAppPassword, testRecipient } = body;
+    const {
+      action,
+      adminEmail,
+      gmailUser,
+      gmailAppPassword,
+      testRecipient,
+      companyDailyHours,
+      enableSundayOt,
+      standardWorkDays,
+    } = body;
 
     // Optional Action: Test Gmail SMTP Connection
     if (action === "test-email") {
@@ -94,9 +110,32 @@ export async function POST(request: Request) {
       });
     }
 
+    if (companyDailyHours !== undefined) {
+      await prisma.systemSetting.upsert({
+        where: { key: "COMPANY_DAILY_HOURS" },
+        create: { key: "COMPANY_DAILY_HOURS", value: String(companyDailyHours) },
+        update: { value: String(companyDailyHours) },
+      });
+    }
+
+    if (enableSundayOt !== undefined) {
+      await prisma.systemSetting.upsert({
+        where: { key: "ENABLE_SUNDAY_OT" },
+        create: { key: "ENABLE_SUNDAY_OT", value: String(enableSundayOt) },
+        update: { value: String(enableSundayOt) },
+      });
+    }
+
+    if (standardWorkDays !== undefined) {
+      await prisma.systemSetting.upsert({
+        where: { key: "STANDARD_WORK_DAYS" },
+        create: { key: "STANDARD_WORK_DAYS", value: String(standardWorkDays) },
+        update: { value: String(standardWorkDays) },
+      });
+    }
+
     return NextResponse.json({ success: true, message: "Settings saved successfully." });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
-

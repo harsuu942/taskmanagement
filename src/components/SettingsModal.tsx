@@ -17,6 +17,8 @@ import {
   ShieldAlert,
   Send,
   Sparkles,
+  Building2,
+  Clock,
 } from "lucide-react";
 
 interface SettingsModalProps {
@@ -32,7 +34,7 @@ export default function SettingsModal({
 }: SettingsModalProps) {
   const isAdmin = currentUser?.role === "ADMIN";
 
-  const [activeTab, setActiveTab] = useState<"password" | "gmail">("password");
+  const [activeTab, setActiveTab] = useState<"password" | "gmail" | "policy">("password");
 
   // Change Password State
   const [currentPassword, setCurrentPassword] = useState("");
@@ -57,6 +59,13 @@ export default function SettingsModal({
   const [testEmailLoading, setTestEmailLoading] = useState(false);
   const [testEmailMessage, setTestEmailMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
+  // Work Policy & Daily Hours State
+  const [companyDailyHours, setCompanyDailyHours] = useState<number>(8);
+  const [enableSundayOt, setEnableSundayOt] = useState<boolean>(true);
+  const [standardWorkDays, setStandardWorkDays] = useState<number>(26);
+  const [policyLoading, setPolicyLoading] = useState(false);
+  const [policyMessage, setPolicyMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
   useEffect(() => {
     if (!isOpen) {
       setPasswordMessage(null);
@@ -80,6 +89,9 @@ export default function SettingsModal({
           setGmailUser(data.settings.gmailUser || "");
           setGmailAppPassword(data.settings.gmailAppPassword || "");
           setGmailConfigured(data.settings.gmailConfigured || false);
+          if (data.settings.companyDailyHours) setCompanyDailyHours(data.settings.companyDailyHours);
+          if (data.settings.enableSundayOt !== undefined) setEnableSundayOt(data.settings.enableSundayOt);
+          if (data.settings.standardWorkDays) setStandardWorkDays(data.settings.standardWorkDays);
         }
       })
       .catch(console.error);
@@ -244,6 +256,37 @@ export default function SettingsModal({
     }
   };
 
+  // Handle Save Work Policy
+  const handleSavePolicy = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPolicyLoading(true);
+    setPolicyMessage(null);
+    try {
+      const res = await fetch("/api/settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          companyDailyHours,
+          enableSundayOt,
+          standardWorkDays,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to save company policy.");
+      setPolicyMessage({
+        type: "success",
+        text: "Company work hours and Sunday OT policy successfully updated!",
+      });
+    } catch (err: any) {
+      setPolicyMessage({
+        type: "error",
+        text: err.message || "Failed to save settings.",
+      });
+    } finally {
+      setPolicyLoading(false);
+    }
+  };
+
   return (
     <div
       className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4"
@@ -291,18 +334,33 @@ export default function SettingsModal({
           </button>
 
           {isAdmin && (
-            <button
-              type="button"
-              onClick={() => setActiveTab("gmail")}
-              className={`flex-1 py-2 px-3 text-xs font-bold rounded-lg transition flex items-center justify-center space-x-1.5 ${
-                activeTab === "gmail"
-                  ? "bg-white text-blue-700 shadow-2xs"
-                  : "text-slate-600 hover:text-slate-900"
-              }`}
-            >
-              <Mail className="w-3.5 h-3.5" />
-              <span>Gmail &amp; EOD Reports</span>
-            </button>
+            <>
+              <button
+                type="button"
+                onClick={() => setActiveTab("gmail")}
+                className={`flex-1 py-2 px-3 text-xs font-bold rounded-lg transition flex items-center justify-center space-x-1.5 ${
+                  activeTab === "gmail"
+                    ? "bg-white text-blue-700 shadow-2xs"
+                    : "text-slate-600 hover:text-slate-900"
+                }`}
+              >
+                <Mail className="w-3.5 h-3.5" />
+                <span>Gmail &amp; Reports</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setActiveTab("policy")}
+                className={`flex-1 py-2 px-3 text-xs font-bold rounded-lg transition flex items-center justify-center space-x-1.5 ${
+                  activeTab === "policy"
+                    ? "bg-white text-blue-700 shadow-2xs"
+                    : "text-slate-600 hover:text-slate-900"
+                }`}
+              >
+                <Building2 className="w-3.5 h-3.5" />
+                <span>Work Policy &amp; OT</span>
+              </button>
+            </>
           )}
         </div>
 
@@ -580,6 +638,121 @@ export default function SettingsModal({
                   <span>{gmailLoading ? "Saving..." : "Save Settings"}</span>
                 </button>
               </div>
+            </div>
+          </form>
+        )}
+
+        {/* TAB 3: WORK POLICY & SUNDAY OT */}
+        {activeTab === "policy" && (
+          <form onSubmit={handleSavePolicy} className="p-6 space-y-4 text-xs">
+            {policyMessage && (
+              <div
+                className={`p-3 rounded-lg text-xs flex items-center space-x-2 ${
+                  policyMessage.type === "success"
+                    ? "bg-emerald-50 text-emerald-800 border border-emerald-200"
+                    : "bg-rose-50 text-rose-800 border border-rose-200"
+                }`}
+              >
+                {policyMessage.type === "success" ? (
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+                ) : (
+                  <AlertCircle className="w-4 h-4 text-rose-600 flex-shrink-0" />
+                )}
+                <span>{policyMessage.text}</span>
+              </div>
+            )}
+
+            <div className="bg-blue-50/70 border border-blue-200 p-3.5 rounded-xl space-y-1">
+              <span className="font-bold text-blue-900 text-xs flex items-center gap-1.5">
+                <Building2 className="w-3.5 h-3.5 text-blue-700" /> Company Work Hours &amp; Overtime Rules
+              </span>
+              <p className="text-[11px] text-blue-800">
+                Configure standard company shift duration and weekend overtime guidelines. These rules determine regular shift hours, calculate employee overtime (OT) in attendance, and generate accurate salary slips.
+              </p>
+            </div>
+
+            {/* Standard Daily Work Hours */}
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                Standard Daily Work Hours <span className="text-rose-500">*</span>
+              </label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="number"
+                  min={4}
+                  max={12}
+                  step={0.5}
+                  required
+                  value={companyDailyHours}
+                  onChange={(e) => setCompanyDailyHours(parseFloat(e.target.value) || 8)}
+                  className="w-32 px-3 py-2 border border-slate-300 rounded-lg text-xs font-bold text-slate-900 focus:ring-2 focus:ring-blue-500 outline-none"
+                />
+                <span className="text-xs font-semibold text-slate-600">Hours / Day (e.g. 8.0 or 9.0)</span>
+              </div>
+              <p className="text-[10px] text-slate-500 mt-1">
+                Standard daily work requirement. Any attendance logged beyond this count is marked as Overtime (OT).
+              </p>
+            </div>
+
+            {/* Sunday Overtime Policy Toggle */}
+            <div className="bg-slate-50 border border-slate-200 p-3.5 rounded-xl space-y-2">
+              <label className="flex items-start space-x-2.5 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={enableSundayOt}
+                  onChange={(e) => setEnableSundayOt(e.target.checked)}
+                  className="mt-0.5 rounded text-blue-600 focus:ring-blue-500"
+                />
+                <div>
+                  <span className="font-bold text-slate-800 text-xs block">
+                    Sunday Work as 100% Overtime (OT)
+                  </span>
+                  <span className="text-[11px] text-slate-500 block mt-0.5">
+                    When enabled, any work hours logged on Sundays are automatically credited as Overtime (OT) to ensure fair compensation on salary slips.
+                  </span>
+                </div>
+              </label>
+            </div>
+
+            {/* Standard Working Days per Month */}
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                Standard Working Days per Month
+              </label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="number"
+                  min={20}
+                  max={31}
+                  required
+                  value={standardWorkDays}
+                  onChange={(e) => setStandardWorkDays(parseInt(e.target.value) || 26)}
+                  className="w-32 px-3 py-2 border border-slate-300 rounded-lg text-xs font-bold text-slate-900 focus:ring-2 focus:ring-blue-500 outline-none"
+                />
+                <span className="text-xs font-semibold text-slate-600">Days / Month (Standard: 26)</span>
+              </div>
+              <p className="text-[10px] text-slate-500 mt-1">
+                Used as the denominator for calculating per-day salary rate and leave loss of pay (LWP).
+              </p>
+            </div>
+
+            {/* Actions */}
+            <div className="pt-4 border-t border-slate-200 flex items-center justify-end space-x-2">
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-100 rounded-lg transition"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={policyLoading}
+                className="px-5 py-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition shadow-xs disabled:opacity-50 flex items-center gap-1.5"
+              >
+                <Clock className="w-3.5 h-3.5" />
+                <span>{policyLoading ? "Saving Policy..." : "Save Work Policy"}</span>
+              </button>
             </div>
           </form>
         )}

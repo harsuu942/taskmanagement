@@ -71,33 +71,58 @@ export async function GET(request: Request) {
         // Date boundaries for task time logs
         const startOfDay = new Date(`${currentDate}T00:00:00.000Z`);
         const endOfDay = new Date(`${currentDate}T23:59:59.999Z`);
+        const localStart = new Date(`${currentDate}T00:00:00`);
+        const localEnd = new Date(`${currentDate}T23:59:59`);
+        const minStart = startOfDay < localStart ? startOfDay : localStart;
+        const maxEnd = endOfDay > localEnd ? endOfDay : localEnd;
 
-        // 2. Fetch tasks worked on or assigned
+        // 2. Fetch tasks worked on, created, or assigned for this employee
         const tasks = await prisma.task.findMany({
           where: {
             isRecurringTemplate: false,
             OR: [
               { assignedToId: emp.id },
               { assignees: { some: { userId: emp.id } } },
-              { timeLogs: { some: { userId: emp.id, startTime: { gte: startOfDay, lte: endOfDay } } } },
+              { timeLogs: { some: { userId: emp.id, startTime: { gte: minStart, lte: maxEnd } } } },
             ],
           },
           include: {
+            client: { select: { id: true, name: true } },
+            taskClients: { include: { client: { select: { id: true, name: true } } } },
             timeLogs: {
               where: {
                 userId: emp.id,
                 startTime: {
-                  gte: startOfDay,
-                  lte: endOfDay,
+                  gte: minStart,
+                  lte: maxEnd,
                 },
               },
             },
           },
         });
 
-        // Calculate task durations strictly logged today
-        const taskReportItems = tasks.map((t) => {
-          const todayLogSum = t.timeLogs.reduce((acc, log) => acc + log.durationSeconds, 0);
+        // Calculate task durations strictly logged on currentDate
+        const allTaskReportItems = tasks.map((t) => {
+          let todayLogSum = 0;
+          for (const log of t.timeLogs) {
+            if (log.isRunning && log.startTime) {
+              const sessionSecs = Math.max(1, Math.floor((new Date().getTime() - new Date(log.startTime).getTime()) / 1000));
+              todayLogSum += sessionSecs;
+            } else {
+              todayLogSum += (log.durationSeconds || 0);
+            }
+          }
+
+          // Resolve client name
+          const clientNames = [
+            t.client?.name,
+            ...(t.taskClients || []).map((tc: any) => tc.client?.name),
+          ].filter(Boolean);
+          const clientName = clientNames.length > 0 ? clientNames.join(", ") : "General / Internal";
+
+          const createdOnDate = t.createdAt >= minStart && t.createdAt <= maxEnd;
+          const updatedOnDate = t.updatedAt >= minStart && t.updatedAt <= maxEnd;
+          const isCompleted = t.employeeStatus === "COMPLETED" || t.adminStatus === "FINAL_COMPLETED";
 
           return {
             id: t.id,
@@ -108,11 +133,20 @@ export async function GET(request: Request) {
             adminStatus: t.adminStatus,
             durationSeconds: todayLogSum,
             billableHours: t.billableHours || 0,
+            clientName,
+            employeeName: emp.name,
+            employeeEmail: emp.email,
+            date: currentDate,
+            isRelevantToDate: todayLogSum > 0 || createdOnDate || (updatedOnDate && isCompleted) || (currentDate === todayStr && t.employeeStatus === "IN_PROGRESS"),
           };
         });
 
+        // Strictly keep tasks that had activity, were created, or completed on this date
+        // If no tasks match, and currentDate is today, show active tasks
+        const taskReportItems = allTaskReportItems.filter((t) => t.isRelevantToDate);
+
         const totalActiveSeconds = taskReportItems.reduce((acc, item) => acc + item.durationSeconds, 0);
-        const totalTasksCompleted = taskReportItems.filter((t) => t.employeeStatus === "COMPLETED").length;
+        const totalTasksCompleted = taskReportItems.filter((t) => t.employeeStatus === "COMPLETED" || t.adminStatus === "FINAL_COMPLETED").length;
         const totalTasksPending = taskReportItems.length - totalTasksCompleted;
 
         let statusStr = "ABSENT_LEAVE";
@@ -149,6 +183,83 @@ export async function GET(request: Request) {
       }
     }
 
+    // Aggregate Client-Wise Data across the date range
+    const clientMap = new Map<string, any>();
+    const budgetVsActualList: any[] = [];
+    const employeeTaskMatrixList: any[] = [];
+
+    reports.forEach((rep) => {
+      rep.tasks.forEach((t) => {
+        const cName = t.clientName || "General / Internal";
+        if (!clientMap.has(cName)) {
+          clientMap.set(cName, {
+            clientName: cName,
+            tasksCount: 0,
+            totalDurationSeconds: 0,
+            totalBillableHours: 0,
+            tasks: [],
+            assignedEmployees: new Set<string>(),
+          });
+        }
+
+        const cGroup = clientMap.get(cName);
+        cGroup.tasksCount += 1;
+        cGroup.totalDurationSeconds += t.durationSeconds;
+        cGroup.totalBillableHours += (t.billableHours || 0);
+        cGroup.tasks.push(t);
+        cGroup.assignedEmployees.add(rep.employee.name);
+
+        const actualHours = parseFloat((t.durationSeconds / 3600).toFixed(2));
+        const billableHours = t.billableHours || 0;
+        const varianceHours = parseFloat((billableHours - actualHours).toFixed(2));
+
+        budgetVsActualList.push({
+          id: `${t.id}-${rep.date}-${rep.employee.id}`,
+          taskId: t.id,
+          title: t.title,
+          clientName: cName,
+          employeeName: rep.employee.name,
+          employeeEmail: rep.employee.email,
+          date: rep.date,
+          billableHours,
+          actualHours,
+          varianceHours,
+          durationSeconds: t.durationSeconds,
+          status: varianceHours >= 0 ? "UNDER_BUDGET" : "OVER_BUDGET",
+          employeeStatus: t.employeeStatus,
+          adminStatus: t.adminStatus,
+        });
+
+        employeeTaskMatrixList.push({
+          id: `${t.id}-${rep.date}-${rep.employee.id}`,
+          taskId: t.id,
+          title: t.title,
+          clientName: cName,
+          employeeName: rep.employee.name,
+          employeeEmail: rep.employee.email,
+          date: rep.date,
+          billableHours,
+          actualHours,
+          durationSeconds: t.durationSeconds,
+          employeeStatus: t.employeeStatus,
+          adminStatus: t.adminStatus,
+        });
+      });
+    });
+
+    const clientReports = Array.from(clientMap.values()).map((c) => {
+      const totalActualHours = parseFloat((c.totalDurationSeconds / 3600).toFixed(2));
+      return {
+        clientName: c.clientName,
+        tasksCount: c.tasksCount,
+        totalDurationSeconds: c.totalDurationSeconds,
+        totalActualHours,
+        totalBillableHours: parseFloat(c.totalBillableHours.toFixed(2)),
+        varianceHours: parseFloat((c.totalBillableHours - totalActualHours).toFixed(2)),
+        assignedEmployees: Array.from(c.assignedEmployees),
+      };
+    }).sort((a, b) => b.totalDurationSeconds - a.totalDurationSeconds);
+
     // Fetch existing saved report dispatches
     const savedReports = await prisma.dailyReport.findMany({
       where: {
@@ -164,6 +275,9 @@ export async function GET(request: Request) {
       date: startDate,
       isRange: startDate !== endDate,
       reports,
+      clientReports,
+      budgetVsActual: budgetVsActualList,
+      employeeTaskMatrix: employeeTaskMatrixList,
       savedReports,
     });
   } catch (error: any) {

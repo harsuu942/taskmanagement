@@ -111,9 +111,63 @@ export async function GET(request: Request) {
       })),
     };
 
+    // Calculate Leave Available - Leave Taken - Balance summary
+    const approvedUserLeaves = allLeavesForStats.filter((l) => l.status === "APPROVED");
+    const casualTaken = approvedUserLeaves
+      .filter((l) => l.leaveType === "CASUAL" || l.leaveType === "HALF_DAY" || l.leaveType === "HOURLY")
+      .reduce((acc, l) => acc + (l.daysCount || 1), 0);
+    const sickTaken = approvedUserLeaves
+      .filter((l) => l.leaveType === "SICK")
+      .reduce((acc, l) => acc + (l.daysCount || 1), 0);
+    const earnedTaken = approvedUserLeaves
+      .filter((l) => l.leaveType === "EARNED")
+      .reduce((acc, l) => acc + (l.daysCount || 1), 0);
+    const unpaidTaken = approvedUserLeaves
+      .filter((l) => l.leaveType === "UNPAID")
+      .reduce((acc, l) => acc + (l.daysCount || 1), 0);
+
+    const leaveSummary = [
+      {
+        leaveType: "CASUAL",
+        label: "Casual Leave",
+        totalAvailable: 12,
+        taken: parseFloat(casualTaken.toFixed(2)),
+        balance: parseFloat(Math.max(0, 12 - casualTaken).toFixed(2)),
+      },
+      {
+        leaveType: "SICK",
+        label: "Sick Leave",
+        totalAvailable: 8,
+        taken: parseFloat(sickTaken.toFixed(2)),
+        balance: parseFloat(Math.max(0, 8 - sickTaken).toFixed(2)),
+      },
+      {
+        leaveType: "EARNED",
+        label: "Earned Leave",
+        totalAvailable: 10,
+        taken: parseFloat(earnedTaken.toFixed(2)),
+        balance: parseFloat(Math.max(0, 10 - earnedTaken).toFixed(2)),
+      },
+      {
+        leaveType: "UNPAID",
+        label: "Unpaid / LWP",
+        totalAvailable: 0,
+        taken: parseFloat(unpaidTaken.toFixed(2)),
+        balance: 0,
+      },
+      {
+        leaveType: "TOTAL",
+        label: "Total Annual Balance",
+        totalAvailable: 30,
+        taken: parseFloat((casualTaken + sickTaken + earnedTaken).toFixed(2)),
+        balance: parseFloat(Math.max(0, 30 - (casualTaken + sickTaken + earnedTaken)).toFixed(2)),
+      },
+    ];
+
     return NextResponse.json({
       leaves: filteredLeaves,
       stats,
+      leaveSummary,
     });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
@@ -123,7 +177,100 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { userId, leaveType, startDate, endDate, reason, daysCount } = body;
+
+    // 1. Admin Bulk Import from Excel / CSV / PDF
+    if (body.leaves && Array.isArray(body.leaves)) {
+      const imported: any[] = [];
+      const standardHours = 8;
+
+      for (const item of body.leaves) {
+        let user = null;
+        if (item.userId) {
+          user = await prisma.user.findFirst({
+            where: {
+              OR: [
+                { id: item.userId },
+                { userId: item.userId },
+                { email: item.userId.toLowerCase() },
+              ],
+            },
+          });
+        }
+        if (!user && item.email) {
+          user = await prisma.user.findUnique({
+            where: { email: item.email.toLowerCase().trim() },
+          });
+        }
+        if (!user && item.name) {
+          user = await prisma.user.findFirst({
+            where: { name: { contains: item.name.trim() } },
+          });
+        }
+
+        if (!user) continue;
+
+        const sDate = item.startDate?.trim();
+        const eDate = (item.endDate?.trim()) || sDate;
+        if (!sDate) continue;
+
+        const lType = (item.leaveType?.toUpperCase() || "CASUAL").replace(/\s+/g, "_");
+        const hours = item.durationHours ? parseFloat(item.durationHours) : null;
+        let dCount = item.daysCount ? parseFloat(item.daysCount) : 1;
+        if (hours && !item.daysCount) {
+          dCount = parseFloat((hours / standardHours).toFixed(2));
+        }
+
+        const stat = item.status?.toUpperCase() === "PENDING" ? "PENDING" : "APPROVED";
+
+        const leave = await prisma.leaveRequest.create({
+          data: {
+            userId: user.id,
+            leaveType: lType,
+            startDate: sDate,
+            endDate: eDate,
+            daysCount: dCount,
+            durationHours: hours,
+            isHourly: !!hours,
+            reason: item.reason?.trim() || "Imported leave record",
+            status: stat,
+            reviewedAt: stat === "APPROVED" ? new Date() : null,
+            reviewNotes: item.notes || "Admin batch import",
+          },
+        });
+        imported.push(leave);
+
+        // If approved, sync ON_LEAVE to attendance
+        if (stat === "APPROVED") {
+          const startT = new Date(sDate).getTime();
+          const endT = new Date(eDate).getTime();
+          const oneDay = 24 * 3600 * 1000;
+          for (let t = startT; t <= endT; t += oneDay) {
+            const dateStr = new Date(t).toISOString().slice(0, 10);
+            await prisma.attendance.upsert({
+              where: { userId_date: { userId: user.id, date: dateStr } },
+              update: { status: "ON_LEAVE", notes: `Approved Leave (${lType})` },
+              create: {
+                userId: user.id,
+                date: dateStr,
+                status: "ON_LEAVE",
+                workDurationSeconds: 0,
+                breakDurationSeconds: 0,
+                notes: `Approved Leave (${lType})`,
+              },
+            });
+          }
+        }
+      }
+
+      return NextResponse.json({
+        success: true,
+        count: imported.length,
+        message: `Successfully imported ${imported.length} leave records.`,
+      });
+    }
+
+    // 2. Single Leave Application
+    const { userId, leaveType, startDate, endDate, reason, daysCount, durationHours, isHourly } = body;
 
     if (!userId) {
       return NextResponse.json({ error: "User ID is required." }, { status: 400 });
@@ -145,18 +292,40 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Start date cannot be after end date." }, { status: 400 });
     }
 
-    // Calculate day count
-    let calculatedDays = 1;
-    if (leaveType === "HALF_DAY") {
-      calculatedDays = 1;
+    // Guard: Employee cannot apply leave on a Public Holiday
+    const overlappingHolidays = await prisma.holiday.findMany({
+      where: {
+        date: { gte: startDate, lte: endDate },
+      },
+    });
+
+    if (overlappingHolidays.length > 0) {
+      const holidayNames = overlappingHolidays.map((h) => `${h.date}: ${h.name}`).join(", ");
+      return NextResponse.json(
+        {
+          error: `Cannot apply leave on official Public Holiday (${holidayNames}). Public holidays are recognized non-working days.`,
+        },
+        { status: 400 }
+      );
+    }
+
+    // Calculate day count & duration
+    const standardDailyHours = 8;
+    let finalDaysCount = 1;
+    let finalHours: number | null = durationHours ? parseFloat(durationHours) : null;
+
+    if (isHourly || leaveType === "HOURLY") {
+      finalHours = durationHours ? parseFloat(durationHours) : 4;
+      finalDaysCount = parseFloat((finalHours / standardDailyHours).toFixed(2));
+    } else if (leaveType === "HALF_DAY") {
+      finalDaysCount = 0.5;
+      finalHours = standardDailyHours / 2;
     } else {
       const start = new Date(startDate).getTime();
       const end = new Date(endDate).getTime();
       const diffDays = Math.round((end - start) / (1000 * 3600 * 24)) + 1;
-      calculatedDays = Math.max(1, diffDays);
+      finalDaysCount = daysCount ? parseFloat(daysCount) : Math.max(1, diffDays);
     }
-
-    const finalDaysCount = daysCount ? parseInt(daysCount, 10) : calculatedDays;
 
     const leave = await prisma.leaveRequest.create({
       data: {
@@ -165,6 +334,8 @@ export async function POST(request: Request) {
         startDate,
         endDate,
         daysCount: finalDaysCount,
+        durationHours: finalHours,
+        isHourly: !!(isHourly || leaveType === "HOURLY"),
         reason: reason.trim(),
         status: "PENDING",
       },

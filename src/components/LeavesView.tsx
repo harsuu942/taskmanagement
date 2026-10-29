@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo } from "react";
-import { User, LeaveRequest, LeaveStats, LeaveType, LeaveStatus } from "@/types";
+import { User, LeaveRequest, LeaveStats, LeaveType, LeaveStatus, LeaveSummaryItem } from "@/types";
 import {
   CalendarDays,
   Plus,
@@ -27,6 +27,11 @@ import {
   ShieldCheck,
   AlertTriangle,
   Edit3,
+  Upload,
+  Download,
+  FileSpreadsheet,
+  Layers,
+  Zap,
 } from "lucide-react";
 
 interface LeavesViewProps {
@@ -44,6 +49,8 @@ export default function LeavesView({
 
   const [leaves, setLeaves] = useState<LeaveRequest[]>([]);
   const [stats, setStats] = useState<LeaveStats | null>(null);
+  const [leaveSummary, setLeaveSummary] = useState<LeaveSummaryItem[]>([]);
+  const [holidaysList, setHolidaysList] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Filters
@@ -65,9 +72,18 @@ export default function LeavesView({
   const [applyType, setApplyType] = useState<LeaveType>("CASUAL");
   const [applyStartDate, setApplyStartDate] = useState(todayStr);
   const [applyEndDate, setApplyEndDate] = useState(todayStr);
+  const [isHourly, setIsHourly] = useState(false);
+  const [durationHours, setDurationHours] = useState<number>(4);
   const [applyReason, setApplyReason] = useState("");
   const [applySubmitting, setApplySubmitting] = useState(false);
   const [applyError, setApplyError] = useState<string | null>(null);
+
+  // Admin Bulk Import State
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [importText, setImportText] = useState("");
+  const [importSubmitting, setImportSubmitting] = useState(false);
+  const [importError, setImportError] = useState<string | null>(null);
+  const [importSuccess, setImportSuccess] = useState<string | null>(null);
 
   // Admin Edit Leave State
   const [editLeaveModal, setEditLeaveModal] = useState<LeaveRequest | null>(null);
@@ -122,7 +138,7 @@ export default function LeavesView({
     }
   };
 
-  // Fetch Leaves & Stats
+  // Fetch Leaves & Stats & Holidays
   const fetchLeaves = async () => {
     if (!currentUser) return;
     setLoading(true);
@@ -133,6 +149,14 @@ export default function LeavesView({
       if (res.ok) {
         setLeaves(data.leaves || []);
         setStats(data.stats || null);
+        setLeaveSummary(data.leaveSummary || []);
+      }
+
+      // Also fetch holidays
+      const holRes = await fetch("/api/holidays");
+      const holData = await holRes.json();
+      if (holRes.ok && holData.holidays) {
+        setHolidaysList(holData.holidays);
       }
     } catch (e) {
       console.error(e);
@@ -145,15 +169,25 @@ export default function LeavesView({
     fetchLeaves();
   }, [currentUser, filterEmployee, filterStatus]);
 
+  // Check if dates conflict with public holiday
+  const conflictingHoliday = useMemo(() => {
+    if (!applyStartDate) return null;
+    const end = applyEndDate || applyStartDate;
+    return holidaysList.find((h) => h.date >= applyStartDate && h.date <= end) || null;
+  }, [applyStartDate, applyEndDate, holidaysList]);
+
   // Calculated day count for form
   const calculatedDays = useMemo(() => {
+    if (isHourly || applyType === "HOURLY") {
+      return parseFloat((durationHours / 8).toFixed(2));
+    }
     if (applyType === "HALF_DAY") return 0.5;
     if (!applyStartDate || !applyEndDate) return 1;
     const start = new Date(applyStartDate).getTime();
     const end = new Date(applyEndDate).getTime();
     if (end < start) return 0;
     return Math.round((end - start) / (1000 * 3600 * 24)) + 1;
-  }, [applyStartDate, applyEndDate, applyType]);
+  }, [applyStartDate, applyEndDate, applyType, isHourly, durationHours]);
 
   // Client-side text & type filter
   const filteredLeaves = useMemo(() => {
@@ -188,20 +222,27 @@ export default function LeavesView({
       setApplyError("Start date cannot be after end date.");
       return;
     }
+    if (conflictingHoliday) {
+      setApplyError(`Official Public Holiday on ${conflictingHoliday.date}: "${conflictingHoliday.name}". Leave cannot be applied on public holidays.`);
+      return;
+    }
 
     setApplySubmitting(true);
     setApplyError(null);
 
     try {
+      const chosenType: LeaveType = isHourly ? "HOURLY" : applyType;
       const res = await fetch("/api/leaves", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           userId: isAdmin ? applyUserId : currentUser?.id,
-          leaveType: applyType,
+          leaveType: chosenType,
           startDate: applyStartDate,
-          endDate: applyEndDate,
-          daysCount: applyType === "HALF_DAY" ? 1 : calculatedDays,
+          endDate: isHourly ? applyStartDate : applyEndDate,
+          daysCount: calculatedDays,
+          durationHours: isHourly ? durationHours : null,
+          isHourly: isHourly,
           reason: applyReason.trim(),
         }),
       });
@@ -215,6 +256,8 @@ export default function LeavesView({
       // Reset form
       setApplyReason("");
       setApplyType("CASUAL");
+      setIsHourly(false);
+      setDurationHours(4);
       setApplyStartDate(todayStr);
       setApplyEndDate(todayStr);
       await fetchLeaves();
@@ -223,6 +266,84 @@ export default function LeavesView({
       setApplyError(err.message);
     } finally {
       setApplySubmitting(false);
+    }
+  };
+
+  // Admin Bulk Import Leaves Handler
+  const handleBulkImportLeaves = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setImportError(null);
+    setImportSuccess(null);
+
+    const lines = importText.split("\n").map(l => l.trim()).filter(Boolean);
+    if (lines.length === 0) {
+      setImportError("Please provide at least one leave entry to import.");
+      return;
+    }
+
+    const parsed: any[] = [];
+    for (const line of lines) {
+      // Allow comma, tab, or pipe separation
+      const delimiter = line.includes("|") ? "|" : line.includes("\t") ? "\t" : ",";
+      const parts = line.split(delimiter).map(p => p.trim());
+      if (parts.length < 4) continue;
+      // Format: Identifier (email/id), LeaveType, StartDate, EndDate, Reason
+      const [empIdentifier, lType, sDate, eDate, ...reasonParts] = parts;
+      if (empIdentifier.toLowerCase().includes("email") || sDate.toLowerCase().includes("start")) continue; // Skip header
+
+      // Find matching employee
+      const matched = allUsers.find(u =>
+        u.email.toLowerCase() === empIdentifier.toLowerCase() ||
+        u.name.toLowerCase() === empIdentifier.toLowerCase() ||
+        u.id === empIdentifier ||
+        u.userId?.toLowerCase() === empIdentifier.toLowerCase()
+      );
+
+      if (!matched) continue;
+
+      let validLeaveType = "CASUAL";
+      const upper = lType.toUpperCase();
+      if (["CASUAL", "SICK", "EARNED", "UNPAID", "HALF_DAY", "HOURLY"].includes(upper)) {
+        validLeaveType = upper;
+      }
+
+      parsed.push({
+        userId: matched.id,
+        leaveType: validLeaveType,
+        startDate: sDate.slice(0, 10),
+        endDate: (eDate || sDate).slice(0, 10),
+        reason: reasonParts.join(" ").trim() || "Imported leave record",
+        status: "APPROVED",
+      });
+    }
+
+    if (parsed.length === 0) {
+      setImportError("Could not recognize any valid employee leave records. Please check the format.");
+      return;
+    }
+
+    setImportSubmitting(true);
+    try {
+      const res = await fetch("/api/leaves", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ leaves: parsed }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to import leaves.");
+
+      setImportSuccess(`Successfully imported ${data.count || parsed.length} leave record(s).`);
+      setImportText("");
+      await fetchLeaves();
+      if (onLeaveUpdated) onLeaveUpdated();
+      setTimeout(() => {
+        setShowImportModal(false);
+        setImportSuccess(null);
+      }, 1500);
+    } catch (err: any) {
+      setImportError(err.message || "Failed to import leaves.");
+    } finally {
+      setImportSubmitting(false);
     }
   };
 
@@ -379,12 +500,30 @@ export default function LeavesView({
           </div>
         </div>
 
-        {/* Action button */}
+        {/* Action buttons */}
         <div className="flex items-center gap-3 flex-wrap sm:flex-nowrap">
+          {isAdmin && (
+            <button
+              onClick={() => {
+                setImportText("");
+                setImportError(null);
+                setImportSuccess(null);
+                setShowImportModal(true);
+              }}
+              className="bg-white/20 hover:bg-white/30 text-white border border-white/30 px-3.5 py-2.5 rounded-xl text-xs font-bold transition flex items-center space-x-1.5"
+              title="Bulk import leave records from Excel, CSV, or PDF text"
+            >
+              <Upload className="w-4 h-4" />
+              <span>Import Leaves (Excel/PDF)</span>
+            </button>
+          )}
+
           <button
             onClick={() => {
               setApplyUserId(currentUser?.id || "");
               setApplyType("CASUAL");
+              setIsHourly(false);
+              setDurationHours(4);
               setApplyStartDate(todayStr);
               setApplyEndDate(todayStr);
               setApplyReason("");
@@ -459,6 +598,88 @@ export default function LeavesView({
               {isAdmin ? stats?.onLeaveTodayCount || 0 : stats?.totalLeaves || 0}
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* Leave Summary Widget: Leave Available - Leave Taken - Balance */}
+      <div className="bg-white rounded-2xl shadow-xs border border-slate-200 p-5 space-y-3">
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <div className="flex items-center space-x-2">
+            <div className="p-1.5 bg-rose-100 rounded-lg text-rose-700">
+              <Sparkles className="w-4 h-4" />
+            </div>
+            <div>
+              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800">
+                Leave Balance Summary
+              </h3>
+              <p className="text-[11px] text-slate-500">
+                Official quota allocation: <span className="font-semibold text-slate-700">Leave Available &minus; Leave Taken = Balance</span>
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center space-x-2 text-[11px] font-semibold text-slate-500">
+            <span className="inline-block w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
+            <span>Annual Allocation: 30 Days (Casual 12, Sick 8, Earned 10)</span>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-3 pt-1">
+          {leaveSummary.map((item) => {
+            const isTotal = item.leaveType === "TOTAL";
+            const isUnpaid = item.leaveType === "UNPAID";
+
+            return (
+              <div
+                key={item.leaveType}
+                className={`p-3.5 rounded-xl border transition ${
+                  isTotal
+                    ? "bg-gradient-to-br from-rose-50 to-pink-50 border-rose-300 col-span-2 md:col-span-1 ring-1 ring-rose-200"
+                    : isUnpaid
+                    ? "bg-slate-50 border-slate-200"
+                    : "bg-white border-slate-200 hover:border-slate-300 shadow-2xs"
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <span className={`text-[11px] font-bold uppercase tracking-wider ${isTotal ? "text-rose-900" : "text-slate-700"}`}>
+                    {item.label}
+                  </span>
+                  {isTotal && (
+                    <span className="text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded bg-rose-200 text-rose-900">
+                      Total
+                    </span>
+                  )}
+                </div>
+
+                <div className="mt-2.5 space-y-1.5 text-xs">
+                  <div className="flex items-center justify-between text-slate-500">
+                    <span>Available:</span>
+                    <span className="font-bold text-slate-800">
+                      {item.totalAvailable > 0 ? `${item.totalAvailable}d` : "&mdash;"}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between text-slate-500">
+                    <span>Taken:</span>
+                    <span className="font-bold text-rose-600">
+                      {item.taken}d
+                    </span>
+                  </div>
+                  <div className="pt-1.5 border-t border-slate-100 flex items-center justify-between font-bold">
+                    <span className={isTotal ? "text-rose-900" : "text-slate-700"}>Balance:</span>
+                    <span className={`px-2 py-0.5 rounded text-xs ${
+                      item.balance > 0
+                        ? "bg-emerald-100 text-emerald-800 font-extrabold"
+                        : isUnpaid
+                        ? "text-slate-500"
+                        : "bg-rose-100 text-rose-800 font-extrabold"
+                    }`}>
+                      {item.totalAvailable > 0 ? `${item.balance}d` : "&mdash;"}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
         </div>
       </div>
 
@@ -855,15 +1076,24 @@ export default function LeavesView({
                     { type: "SICK", label: "Sick Leave", icon: HeartPulse },
                     { type: "EARNED", label: "Earned / Paid", icon: Palmtree },
                     { type: "UNPAID", label: "Unpaid Leave", icon: Calendar },
-                    { type: "HALF_DAY", label: "Half Day", icon: Sun },
+                    { type: "HALF_DAY", label: "Half Day (4h)", icon: Sun },
+                    { type: "HOURLY", label: "Hourly Leave (hrs)", icon: Clock },
                   ].map((t) => {
                     const Icon = t.icon;
-                    const isSelected = applyType === t.type;
+                    const isSelected = (t.type === "HOURLY" && isHourly) || (!isHourly && applyType === t.type);
                     return (
                       <button
                         key={t.type}
                         type="button"
-                        onClick={() => setApplyType(t.type as LeaveType)}
+                        onClick={() => {
+                          if (t.type === "HOURLY") {
+                            setIsHourly(true);
+                            setApplyType("HOURLY");
+                          } else {
+                            setIsHourly(false);
+                            setApplyType(t.type as LeaveType);
+                          }
+                        }}
                         className={`p-2 rounded-lg border text-left flex items-center space-x-2 transition ${
                           isSelected
                             ? "bg-rose-50 border-rose-500 text-rose-900 font-bold ring-1 ring-rose-500"
@@ -878,11 +1108,49 @@ export default function LeavesView({
                 </div>
               </div>
 
+              {/* If Hourly Leave Selected: Hours Input */}
+              {isHourly && (
+                <div className="bg-amber-50/70 border border-amber-200 p-3.5 rounded-xl space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-xs font-bold text-amber-900">
+                      Duration in Hours (1 &ndash; 8 hrs) <span className="text-rose-500">*</span>
+                    </label>
+                    <span className="text-xs font-extrabold text-amber-900 bg-amber-100 px-2 py-0.5 rounded border border-amber-300">
+                      {(durationHours / 8).toFixed(2)} Day(s)
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="range"
+                      min={1}
+                      max={8}
+                      step={0.5}
+                      value={durationHours}
+                      onChange={(e) => setDurationHours(parseFloat(e.target.value))}
+                      className="w-full accent-rose-600 cursor-pointer"
+                    />
+                    <input
+                      type="number"
+                      min={0.5}
+                      max={8}
+                      step={0.5}
+                      value={durationHours}
+                      onChange={(e) => setDurationHours(Math.max(0.5, Math.min(8, parseFloat(e.target.value) || 1)))}
+                      className="w-20 px-2.5 py-1 text-center font-bold border border-amber-300 rounded-lg bg-white"
+                    />
+                    <span className="text-xs font-semibold text-amber-800">Hours</span>
+                  </div>
+                  <p className="text-[11px] text-amber-700">
+                    Calculated on standard company 8-hour workday basis: <span className="font-bold">{durationHours} hours &divide; 8 = {(durationHours / 8).toFixed(2)} days</span> deduction.
+                  </p>
+                </div>
+              )}
+
               {/* Date Pickers */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
-                    Start Date <span className="text-rose-500">*</span>
+                    {isHourly ? "Leave Date" : "Start Date"} <span className="text-rose-500">*</span>
                   </label>
                   <input
                     type="date"
@@ -890,7 +1158,7 @@ export default function LeavesView({
                     value={applyStartDate}
                     onChange={(e) => {
                       setApplyStartDate(e.target.value);
-                      if (applyEndDate < e.target.value) {
+                      if (applyEndDate < e.target.value || isHourly) {
                         setApplyEndDate(e.target.value);
                       }
                     }}
@@ -898,25 +1166,46 @@ export default function LeavesView({
                   />
                 </div>
 
-                <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
-                    End Date <span className="text-rose-500">*</span>
-                  </label>
-                  <input
-                    type="date"
-                    required
-                    value={applyEndDate}
-                    onChange={(e) => setApplyEndDate(e.target.value)}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-rose-500 outline-none font-medium"
-                  />
-                </div>
+                {!isHourly && (
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                      End Date <span className="text-rose-500">*</span>
+                    </label>
+                    <input
+                      type="date"
+                      required
+                      value={applyEndDate}
+                      onChange={(e) => setApplyEndDate(e.target.value)}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-rose-500 outline-none font-medium"
+                    />
+                  </div>
+                )}
               </div>
+
+              {/* Public Holiday Conflict Warning Banner */}
+              {conflictingHoliday && (
+                <div className="p-3 text-xs bg-rose-50 border border-rose-300 text-rose-800 rounded-xl flex items-start gap-2.5">
+                  <AlertTriangle className="w-4 h-4 text-rose-600 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <div className="font-bold">
+                      Official Public Holiday: {conflictingHoliday.name} ({conflictingHoliday.date})
+                    </div>
+                    <p className="mt-0.5 text-[11px] text-rose-700">
+                      Employees cannot apply for leave on an official holiday. Your attendance is already marked as a paid Public Holiday on this date.
+                    </p>
+                  </div>
+                </div>
+              )}
 
               {/* Total Duration Banner */}
               <div className="p-2.5 bg-rose-50/70 border border-rose-200 rounded-xl flex items-center justify-between text-xs font-semibold text-rose-900">
                 <span>Calculated Total Duration:</span>
                 <span className="font-extrabold text-rose-800 bg-white px-2 py-0.5 rounded border border-rose-200">
-                  {applyType === "HALF_DAY" ? "0.5 Day (Half Day)" : `${calculatedDays} Calendar Day(s)`}
+                  {isHourly
+                    ? `${durationHours} Hour(s) = ${(durationHours / 8).toFixed(2)} Day`
+                    : applyType === "HALF_DAY"
+                    ? "0.5 Day (Half Day)"
+                    : `${calculatedDays} Calendar Day(s)`}
                 </span>
               </div>
 
@@ -945,11 +1234,103 @@ export default function LeavesView({
                 </button>
                 <button
                   type="submit"
-                  disabled={applySubmitting}
-                  className="px-5 py-2 text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 rounded-lg transition shadow-xs disabled:opacity-50 flex items-center gap-1.5"
+                  disabled={applySubmitting || !!conflictingHoliday}
+                  className="px-5 py-2 text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 rounded-lg transition shadow-xs disabled:opacity-50 flex items-center gap-1.5 cursor-pointer"
                 >
                   <CalendarDays className="w-3.5 h-3.5" />
                   <span>{applySubmitting ? "Submitting..." : "Submit Leave Application"}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: Admin Bulk Import Leaves (Excel/PDF) */}
+      {showImportModal && (
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-2xl w-full overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-slate-50">
+              <div className="flex items-center space-x-2">
+                <FileSpreadsheet className="w-5 h-5 text-rose-600" />
+                <h3 className="text-sm font-bold text-slate-900">
+                  Import Leave Records (Excel / CSV / PDF)
+                </h3>
+              </div>
+              <button
+                onClick={() => setShowImportModal(false)}
+                className="text-slate-400 hover:text-slate-700 p-1 rounded-lg"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleBulkImportLeaves} className="p-6 space-y-4 text-xs">
+              {importError && (
+                <div className="p-3 text-xs bg-rose-50 border border-rose-200 text-rose-700 rounded-lg flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                  <span>{importError}</span>
+                </div>
+              )}
+
+              {importSuccess && (
+                <div className="p-3 text-xs bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-lg flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
+                  <span>{importSuccess}</span>
+                </div>
+              )}
+
+              <div className="bg-slate-50 border border-slate-200 p-3.5 rounded-xl space-y-2">
+                <div className="font-bold text-slate-800 flex items-center justify-between">
+                  <span>Standard Data Format (Pipe, Comma, or Tab separated):</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const sample = `Employee Email / Name | Leave Type | Start Date | End Date | Reason\n${allUsers[0]?.email || "employee@gmail.com"} | CASUAL | 2026-11-02 | 2026-11-03 | Family Function\n${allUsers[1]?.email || "employee2@gmail.com"} | SICK | 2026-11-05 | 2026-11-05 | Viral Fever`;
+                      setImportText(sample);
+                    }}
+                    className="text-rose-600 hover:underline text-[11px] font-semibold"
+                  >
+                    Paste Sample Template
+                  </button>
+                </div>
+                <div className="font-mono text-[11px] text-slate-600 bg-white p-2 rounded border border-slate-200">
+                  Employee_Email | Leave_Type | Start_Date (YYYY-MM-DD) | End_Date | Reason
+                </div>
+                <p className="text-[11px] text-slate-500">
+                  Supported Leave Types: <code className="bg-slate-200 px-1 rounded">CASUAL</code>, <code className="bg-slate-200 px-1 rounded">SICK</code>, <code className="bg-slate-200 px-1 rounded">EARNED</code>, <code className="bg-slate-200 px-1 rounded">UNPAID</code>, <code className="bg-slate-200 px-1 rounded">HALF_DAY</code>, <code className="bg-slate-200 px-1 rounded">HOURLY</code>.
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                  Paste Leave Records or Data from PDF / Excel <span className="text-rose-500">*</span>
+                </label>
+                <textarea
+                  rows={8}
+                  required
+                  placeholder="Paste table copied from Excel, Google Sheets, or extracted from PDF..."
+                  value={importText}
+                  onChange={(e) => setImportText(e.target.value)}
+                  className="w-full px-3 py-2 font-mono text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-rose-500 outline-none"
+                />
+              </div>
+
+              <div className="pt-3 border-t border-slate-200 flex items-center justify-end space-x-2">
+                <button
+                  type="button"
+                  onClick={() => setShowImportModal(false)}
+                  className="px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-100 rounded-lg transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={importSubmitting || !importText.trim()}
+                  className="px-5 py-2 text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 rounded-lg transition shadow-xs disabled:opacity-50 flex items-center gap-1.5"
+                >
+                  <Upload className="w-3.5 h-3.5" />
+                  <span>{importSubmitting ? "Importing Leaves..." : "Import Leaves to Database"}</span>
                 </button>
               </div>
             </form>

@@ -29,6 +29,17 @@ export interface User {
   role: Role;
   designation?: string | null;
   avatar?: string | null;
+  phone?: string | null;
+  panNumber?: string | null;
+  address?: string | null;
+  joiningDate?: string | null;
+  salary?: number | null;
+  hourlyRate?: number | null;
+  bankAccountName?: string | null;
+  bankName?: string | null;
+  bankBranch?: string | null;
+  bankAccountNumber?: string | null;
+  bankIfsc?: string | null;
   createdAt: string;
 }
 
@@ -166,6 +177,10 @@ export interface TaskReportItem {
   adminStatus: string;
   durationSeconds: number;
   billableHours?: number | null;
+  clientName?: string | null;
+  employeeName?: string | null;
+  employeeEmail?: string | null;
+  date?: string;
 }
 
 export interface EmployeeDailyReportData {
@@ -191,7 +206,7 @@ export interface EmployeeDailyReportData {
   totalTasksPending: number;
 }
 
-export type LeaveType = "CASUAL" | "SICK" | "EARNED" | "UNPAID" | "HALF_DAY";
+export type LeaveType = "CASUAL" | "SICK" | "EARNED" | "UNPAID" | "HALF_DAY" | "HOURLY";
 export type LeaveStatus = "PENDING" | "APPROVED" | "REJECTED";
 
 export interface LeaveRequest {
@@ -202,6 +217,8 @@ export interface LeaveRequest {
   startDate: string;
   endDate: string;
   daysCount: number;
+  durationHours?: number | null;
+  isHourly?: boolean;
   reason: string;
   status: LeaveStatus;
   reviewedById?: string | null;
@@ -210,6 +227,14 @@ export interface LeaveRequest {
   reviewedAt?: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface LeaveSummaryItem {
+  leaveType: string;
+  label: string;
+  totalAvailable: number;
+  taken: number;
+  balance: number;
 }
 
 export interface LeaveStats {

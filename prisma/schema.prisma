@@ -16,6 +16,17 @@ model User {
   role         String       @default("EMPLOYEE") // "ADMIN" | "EMPLOYEE"
   designation  String?      @default("Team Member")
   avatar       String?
+  phone        String?
+  panNumber    String?
+  address      String?
+  joiningDate  DateTime?
+  salary       Float?       @default(0)
+  hourlyRate   Float?       @default(0)
+  bankAccountName   String?
+  bankName          String?
+  bankBranch        String?
+  bankAccountNumber String?
+  bankIfsc          String?
   createdAt    DateTime     @default(now())
   updatedAt    DateTime     @updatedAt
 
@@ -156,10 +167,12 @@ model LeaveRequest {
   id           String    @id @default(cuid())
   userId       String
   user         User      @relation("UserLeaves", fields: [userId], references: [id], onDelete: Cascade)
-  leaveType    String    // CASUAL | SICK | EARNED | UNPAID | HALF_DAY
+  leaveType    String    // CASUAL | SICK | EARNED | UNPAID | HALF_DAY | HOURLY
   startDate    String    // YYYY-MM-DD
   endDate      String    // YYYY-MM-DD
-  daysCount    Int       @default(1)
+  daysCount    Float     @default(1)
+  durationHours Float?
+  isHourly     Boolean   @default(false)
   reason       String
   status       String    @default("PENDING") // PENDING | APPROVED | REJECTED
   reviewedById String?

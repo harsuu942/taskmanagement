@@ -19,7 +19,15 @@ import {
   ShieldCheck,
   UserCheck,
   Pencil,
+  FileText,
+  Phone,
+  CreditCard,
+  Building,
+  DollarSign,
+  Calendar,
+  MapPin,
 } from "lucide-react";
+import SalarySlipModal from "./SalarySlipModal";
 
 interface EmployeeManagementProps {
   currentUser: User | null;
@@ -33,6 +41,8 @@ export default function EmployeeManagement({
   const [employees, setEmployees] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
+
+  // Add Form State
   const [name, setName] = useState("");
   const [userId, setUserId] = useState("");
   const [email, setEmail] = useState("");
@@ -40,6 +50,18 @@ export default function EmployeeManagement({
   const [showPassword, setShowPassword] = useState(false);
   const [designation, setDesignation] = useState("");
   const [role, setRole] = useState("EMPLOYEE");
+  const [phone, setPhone] = useState("");
+  const [panNumber, setPanNumber] = useState("");
+  const [address, setAddress] = useState("");
+  const [joiningDate, setJoiningDate] = useState("");
+  const [salary, setSalary] = useState<string>("");
+  const [hourlyRate, setHourlyRate] = useState<string>("");
+  const [bankAccountName, setBankAccountName] = useState("");
+  const [bankName, setBankName] = useState("");
+  const [bankBranch, setBankBranch] = useState("");
+  const [bankAccountNumber, setBankAccountNumber] = useState("");
+  const [bankIfsc, setBankIfsc] = useState("");
+
   const [formLoading, setFormLoading] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
@@ -52,8 +74,23 @@ export default function EmployeeManagement({
   const [showEditPassword, setShowEditPassword] = useState(false);
   const [editDesignation, setEditDesignation] = useState("");
   const [editRole, setEditRole] = useState("EMPLOYEE");
+  const [editPhone, setEditPhone] = useState("");
+  const [editPanNumber, setEditPanNumber] = useState("");
+  const [editAddress, setEditAddress] = useState("");
+  const [editJoiningDate, setEditJoiningDate] = useState("");
+  const [editSalary, setEditSalary] = useState<string>("");
+  const [editHourlyRate, setEditHourlyRate] = useState<string>("");
+  const [editBankAccountName, setEditBankAccountName] = useState("");
+  const [editBankName, setEditBankName] = useState("");
+  const [editBankBranch, setEditBankBranch] = useState("");
+  const [editBankAccountNumber, setEditBankAccountNumber] = useState("");
+  const [editBankIfsc, setEditBankIfsc] = useState("");
+
   const [editLoading, setEditLoading] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
+
+  // Salary Slip Modal State
+  const [salarySlipEmployee, setSalarySlipEmployee] = useState<any | null>(null);
 
   const openEditModal = (emp: any) => {
     setEditingEmployee(emp);
@@ -64,9 +101,19 @@ export default function EmployeeManagement({
     setEditRole(emp.role || "EMPLOYEE");
     setEditPassword("");
     setShowEditPassword(false);
+    setEditPhone(emp.phone || "");
+    setEditPanNumber(emp.panNumber || "");
+    setEditAddress(emp.address || "");
+    setEditJoiningDate(emp.joiningDate || "");
+    setEditSalary(emp.salary ? String(emp.salary) : "");
+    setEditHourlyRate(emp.hourlyRate ? String(emp.hourlyRate) : "");
+    setEditBankAccountName(emp.bankAccountName || emp.name || "");
+    setEditBankName(emp.bankName || "");
+    setEditBankBranch(emp.bankBranch || "");
+    setEditBankAccountNumber(emp.bankAccountNumber || "");
+    setEditBankIfsc(emp.bankIfsc || "");
     setEditError(null);
   };
-
 
   const fetchEmployees = async () => {
     setLoading(true);
@@ -108,6 +155,17 @@ export default function EmployeeManagement({
           password: password || "employee123",
           designation: designation.trim() || "Team Member",
           role,
+          phone: phone.trim() || null,
+          panNumber: panNumber.trim().toUpperCase() || null,
+          address: address.trim() || null,
+          joiningDate: joiningDate || null,
+          salary: salary ? parseFloat(salary) : null,
+          hourlyRate: hourlyRate ? parseFloat(hourlyRate) : null,
+          bankAccountName: bankAccountName.trim() || null,
+          bankName: bankName.trim() || null,
+          bankBranch: bankBranch.trim() || null,
+          bankAccountNumber: bankAccountNumber.trim() || null,
+          bankIfsc: bankIfsc.trim().toUpperCase() || null,
         }),
       });
 
@@ -122,6 +180,17 @@ export default function EmployeeManagement({
       setEmail("");
       setPassword("employee123");
       setDesignation("");
+      setPhone("");
+      setPanNumber("");
+      setAddress("");
+      setJoiningDate("");
+      setSalary("");
+      setHourlyRate("");
+      setBankAccountName("");
+      setBankName("");
+      setBankBranch("");
+      setBankAccountNumber("");
+      setBankIfsc("");
       fetchEmployees();
       onRefresh();
     } catch (err: any) {
@@ -154,6 +223,17 @@ export default function EmployeeManagement({
           password: editPassword.trim() || undefined,
           designation: editDesignation.trim() || "Team Member",
           role: editRole,
+          phone: editPhone.trim() || null,
+          panNumber: editPanNumber.trim().toUpperCase() || null,
+          address: editAddress.trim() || null,
+          joiningDate: editJoiningDate || null,
+          salary: editSalary ? parseFloat(editSalary) : null,
+          hourlyRate: editHourlyRate ? parseFloat(editHourlyRate) : null,
+          bankAccountName: editBankAccountName.trim() || null,
+          bankName: editBankName.trim() || null,
+          bankBranch: editBankBranch.trim() || null,
+          bankAccountNumber: editBankAccountNumber.trim() || null,
+          bankIfsc: editBankIfsc.trim().toUpperCase() || null,
         }),
       });
 
@@ -172,7 +252,6 @@ export default function EmployeeManagement({
     }
   };
 
-
   return (
     <div className="space-y-6">
       {/* Top Banner */}
@@ -181,20 +260,20 @@ export default function EmployeeManagement({
           <div className="flex items-center space-x-2">
             <Users className="w-5 h-5 text-blue-600" />
             <h3 className="text-base font-bold text-slate-900">
-              Team Directory &amp; Employee Management
+              Employee&apos;s list
             </h3>
           </div>
           <p className="text-xs text-slate-500 mt-1">
-            Register new team members with their unique User ID and password to grant workspace access and manage task assignments.
+            Manage staff profiles, contact numbers, PAN details, bank accounts, monthly salary, and generate salary slips.
           </p>
         </div>
 
         <button
           onClick={() => setShowAddModal(true)}
-          className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-4 py-2.5 rounded-lg text-xs transition shadow-sm flex items-center space-x-1.5 flex-shrink-0"
+          className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-4 py-2.5 rounded-lg text-xs transition shadow-sm flex items-center space-x-1.5 flex-shrink-0 cursor-pointer"
         >
           <UserPlus className="w-4 h-4" />
-          <span>+ Add Employee with User ID &amp; Password</span>
+          <span>+ Add Employee Profile</span>
         </button>
       </div>
 
@@ -207,7 +286,7 @@ export default function EmployeeManagement({
           <button
             onClick={fetchEmployees}
             className="p-1.5 text-slate-500 hover:text-slate-800 hover:bg-slate-200 rounded-lg transition"
-            title="Refresh team list"
+            title="Refresh employee list"
           >
             <RefreshCw className="w-4 h-4" />
           </button>
@@ -218,11 +297,11 @@ export default function EmployeeManagement({
             <thead>
               <tr className="bg-slate-100 text-slate-600 font-bold border-b border-slate-200 uppercase tracking-wider text-[11px]">
                 <th className="py-3 px-4">Employee</th>
-                <th className="py-3 px-4">Login User ID</th>
-                <th className="py-3 px-4">Gmail Account</th>
+                <th className="py-3 px-4">User ID &amp; Email</th>
                 <th className="py-3 px-4">Designation</th>
-                <th className="py-3 px-4">Assigned Tasks</th>
-                <th className="py-3 px-4">Completed Tasks</th>
+                <th className="py-3 px-4">Contact / Phone</th>
+                <th className="py-3 px-4">PAN &amp; Joining</th>
+                <th className="py-3 px-4">Salary / Rate</th>
                 <th className="py-3 px-4 text-center">Role</th>
                 <th className="py-3 px-4 text-right">Actions</th>
               </tr>
@@ -231,15 +310,11 @@ export default function EmployeeManagement({
               {employees.length === 0 ? (
                 <tr>
                   <td colSpan={8} className="py-12 text-center text-slate-400">
-                    No employees registered yet. Click "+ Add Employee" to onboard staff.
+                    No employees registered yet. Click &quot;+ Add Employee Profile&quot; to onboard staff.
                   </td>
                 </tr>
               ) : (
                 employees.map((emp) => {
-                  const completedCount = emp.assignedTasks?.filter(
-                    (t: any) => t.employeeStatus === "COMPLETED" || t.adminStatus === "FINAL_COMPLETED"
-                  ).length || 0;
-
                   return (
                     <tr key={emp.id} className="hover:bg-slate-50">
                       <td className="py-3 px-4 font-semibold text-slate-800">
@@ -255,34 +330,61 @@ export default function EmployeeManagement({
                               {emp.name.slice(0, 1)}
                             </div>
                           )}
-                          <span>{emp.name}</span>
+                          <div>
+                            <span className="block font-bold">{emp.name}</span>
+                            {emp.bankAccountName && (
+                              <span className="text-[10px] text-slate-400 block">
+                                Bank: {emp.bankName || "Linked"}
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </td>
 
-                      {/* User ID Column */}
-                      <td className="py-3 px-4 font-mono font-bold text-blue-700 text-xs">
-                        <span className="bg-blue-50 border border-blue-200 px-2 py-0.5 rounded">
+                      {/* User ID & Email */}
+                      <td className="py-3 px-4">
+                        <div className="font-mono font-bold text-blue-700 text-[11px]">
                           {emp.userId || emp.email.split("@")[0]}
-                        </span>
-                      </td>
-
-                      <td className="py-3 px-4 text-slate-700 font-mono text-[11px]">
-                        <div className="flex items-center space-x-1">
-                          <Mail className="w-3.5 h-3.5 text-slate-400" />
+                        </div>
+                        <div className="flex items-center space-x-1 text-slate-500 text-[11px] font-mono mt-0.5">
+                          <Mail className="w-3 h-3 text-slate-400" />
                           <span>{emp.email}</span>
                         </div>
                       </td>
 
-                      <td className="py-3 px-4 text-slate-600 font-medium">
+                      <td className="py-3 px-4 text-slate-700 font-medium">
                         {emp.designation || "Team Member"}
                       </td>
 
-                      <td className="py-3 px-4 font-bold text-blue-700">
-                        {emp.assignedTasks?.length || 0} tasks
+                      <td className="py-3 px-4 text-slate-600">
+                        {emp.phone ? (
+                          <div className="flex items-center space-x-1 font-semibold text-slate-800">
+                            <Phone className="w-3 h-3 text-emerald-600" />
+                            <span>{emp.phone}</span>
+                          </div>
+                        ) : (
+                          <span className="text-slate-400 italic">Not provided</span>
+                        )}
                       </td>
 
-                      <td className="py-3 px-4 font-bold text-emerald-600">
-                        {completedCount} completed
+                      <td className="py-3 px-4 text-slate-700">
+                        <div className="font-mono font-bold uppercase text-slate-800 text-[11px]">
+                          {emp.panNumber || <span className="text-slate-400 font-normal italic">No PAN</span>}
+                        </div>
+                        <div className="text-[10px] text-slate-500 mt-0.5">
+                          {emp.joiningDate ? `DOJ: ${emp.joiningDate}` : "DOJ: &mdash;"}
+                        </div>
+                      </td>
+
+                      <td className="py-3 px-4">
+                        <div className="font-bold text-emerald-700">
+                          {emp.salary ? `₹${Number(emp.salary).toLocaleString("en-IN")}/mo` : "Not set"}
+                        </div>
+                        {emp.hourlyRate && (
+                          <div className="text-[10px] text-slate-500">
+                            ₹{emp.hourlyRate}/hr
+                          </div>
+                        )}
                       </td>
 
                       <td className="py-3 px-4 text-center">
@@ -295,17 +397,30 @@ export default function EmployeeManagement({
                         </span>
                       </td>
 
-                      <td className="py-3 px-4 text-right">
-                        {currentUser?.role === "ADMIN" && (
+                      <td className="py-3 px-4 text-right whitespace-nowrap">
+                        <div className="flex items-center justify-end space-x-1.5">
+                          {/* Salary Slip Button */}
                           <button
-                            onClick={() => openEditModal(emp)}
-                            className="inline-flex items-center space-x-1 px-2.5 py-1 text-[11px] font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-lg border border-blue-200 transition shadow-2xs"
-                            title="Edit employee details"
+                            onClick={() => setSalarySlipEmployee(emp)}
+                            className="inline-flex items-center space-x-1 px-2.5 py-1 text-[11px] font-bold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 rounded-lg border border-emerald-300 transition shadow-2xs cursor-pointer"
+                            title="Generate & Email Salary Slip"
                           >
-                            <Pencil className="w-3 h-3 text-blue-600" />
-                            <span>Edit</span>
+                            <FileText className="w-3 h-3 text-emerald-600" />
+                            <span>Salary Slip</span>
                           </button>
-                        )}
+
+                          {/* Edit Button */}
+                          {currentUser?.role === "ADMIN" && (
+                            <button
+                              onClick={() => openEditModal(emp)}
+                              className="inline-flex items-center space-x-1 px-2.5 py-1 text-[11px] font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-lg border border-blue-200 transition shadow-2xs cursor-pointer"
+                              title="Edit employee details"
+                            >
+                              <Pencil className="w-3 h-3 text-blue-600" />
+                              <span>Edit</span>
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   );
@@ -319,11 +434,11 @@ export default function EmployeeManagement({
       {/* Add Employee Modal */}
       {showAddModal && (
         <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-md w-full overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-slate-50">
+          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-2xl w-full overflow-hidden animate-in fade-in zoom-in-95 duration-200 max-h-[92vh] flex flex-col">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-slate-50 flex-shrink-0">
               <div className="flex items-center space-x-2">
                 <UserPlus className="w-5 h-5 text-blue-600" />
-                <h3 className="text-base font-bold text-slate-900">Add New Employee</h3>
+                <h3 className="text-base font-bold text-slate-900">Add New Employee Profile</h3>
               </div>
               <button
                 onClick={() => setShowAddModal(false)}
@@ -333,7 +448,7 @@ export default function EmployeeManagement({
               </button>
             </div>
 
-            <form onSubmit={handleCreateEmployee} className="p-6 space-y-3.5">
+            <form onSubmit={handleCreateEmployee} className="p-6 space-y-4 text-xs overflow-y-auto">
               {formError && (
                 <div className="bg-rose-50 border border-rose-200 text-rose-700 text-xs p-3 rounded-lg flex items-center gap-2">
                   <AlertCircle className="w-4 h-4 flex-shrink-0" />
@@ -341,94 +456,267 @@ export default function EmployeeManagement({
                 </div>
               )}
 
+              {/* Section 1: Basic & Login Info */}
               <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
-                  Full Name <span className="text-rose-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Maya Lin"
-                  value={name}
-                  onChange={(e) => {
-                    setName(e.target.value);
-                    if (!userId) {
-                      setUserId(e.target.value.toLowerCase().replace(/\s+/g, "."));
-                    }
-                  }}
-                  className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-                />
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
-                    Login User ID <span className="text-rose-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. maya.lin or EMP-104"
-                    value={userId}
-                    onChange={(e) => setUserId(e.target.value)}
-                    className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-mono"
-                  />
-                  <p className="text-[10px] text-slate-400 mt-0.5">Used for signing in.</p>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
-                    Initial Password <span className="text-rose-500">*</span>
-                  </label>
-                  <div className="relative">
+                <h4 className="font-bold text-slate-800 text-[11px] uppercase tracking-wider mb-2.5 pb-1 border-b border-slate-100">
+                  1. Login &amp; Workspace Account
+                </h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                      Full Name <span className="text-rose-500">*</span>
+                    </label>
                     <input
-                      type={showPassword ? "text" : "password"}
+                      type="text"
                       required
-                      placeholder="e.g. employee123"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none pr-8 font-mono"
+                      placeholder="e.g. Maya Lin"
+                      value={name}
+                      onChange={(e) => {
+                        setName(e.target.value);
+                        if (!userId) {
+                          setUserId(e.target.value.toLowerCase().replace(/\s+/g, "."));
+                        }
+                      }}
+                      className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
                     />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-                    >
-                      {showPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                    </button>
                   </div>
-                  <p className="text-[10px] text-slate-400 mt-0.5">Employee can change later.</p>
+
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                      Login User ID <span className="text-rose-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. maya.lin"
+                      value={userId}
+                      onChange={(e) => setUserId(e.target.value)}
+                      className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-mono"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                      Gmail Account <span className="text-rose-500">*</span>
+                    </label>
+                    <input
+                      type="email"
+                      required
+                      placeholder="e.g. maya.lin@gmail.com"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-mono"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                      Initial Password <span className="text-rose-500">*</span>
+                    </label>
+                    <div className="relative">
+                      <input
+                        type={showPassword ? "text" : "password"}
+                        required
+                        placeholder="e.g. employee123"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none pr-8 font-mono"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                      >
+                        {showPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                      Designation
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Senior Tax Consultant"
+                      value={designation}
+                      onChange={(e) => setDesignation(e.target.value)}
+                      className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                      Role Access
+                    </label>
+                    <select
+                      value={role}
+                      onChange={(e) => setRole(e.target.value)}
+                      className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-medium bg-white"
+                    >
+                      <option value="EMPLOYEE">Employee</option>
+                      <option value="ADMIN">Admin</option>
+                    </select>
+                  </div>
                 </div>
               </div>
 
+              {/* Section 2: Contact, Statutory & Compensation */}
               <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
-                  Gmail Account <span className="text-rose-500">*</span>
-                </label>
-                <input
-                  type="email"
-                  required
-                  placeholder="e.g. maya.lin.eng@gmail.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-mono"
-                />
-                <p className="text-[10px] text-slate-400 mt-0.5">
-                  Daily reports and automated summaries are dispatched to this address.
-                </p>
+                <h4 className="font-bold text-slate-800 text-[11px] uppercase tracking-wider mb-2.5 pb-1 border-b border-slate-100">
+                  2. Contact &amp; Compensation Particulars
+                </h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                      Phone Number
+                    </label>
+                    <input
+                      type="tel"
+                      placeholder="e.g. +91 98765 43210"
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value)}
+                      className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                      PAN Number
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. ABCDE1234F"
+                      value={panNumber}
+                      onChange={(e) => setPanNumber(e.target.value.toUpperCase())}
+                      className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-mono uppercase"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                      Joining Date
+                    </label>
+                    <input
+                      type="date"
+                      value={joiningDate}
+                      onChange={(e) => setJoiningDate(e.target.value)}
+                      className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-medium"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                      Monthly Salary (₹ CTC)
+                    </label>
+                    <input
+                      type="number"
+                      placeholder="e.g. 45000"
+                      value={salary}
+                      onChange={(e) => setSalary(e.target.value)}
+                      className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-bold"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                      Hourly Rate (₹/hr for OT)
+                    </label>
+                    <input
+                      type="number"
+                      placeholder="e.g. 250"
+                      value={hourlyRate}
+                      onChange={(e) => setHourlyRate(e.target.value)}
+                      className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                    />
+                  </div>
+
+                  <div className="sm:col-span-2">
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                      Residential Address
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Flat 402, Lotus Towers, Andheri West, Mumbai"
+                      value={address}
+                      onChange={(e) => setAddress(e.target.value)}
+                      className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                    />
+                  </div>
+                </div>
               </div>
 
+              {/* Section 3: Bank Details */}
               <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
-                  Designation / Role Title
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g. Senior Tax Auditor / Financial Analyst"
-                  value={designation}
-                  onChange={(e) => setDesignation(e.target.value)}
-                  className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-                />
+                <h4 className="font-bold text-slate-800 text-[11px] uppercase tracking-wider mb-2.5 pb-1 border-b border-slate-100">
+                  3. Bank Details (For Payslips &amp; Direct Deposit)
+                </h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                      Emp Name as per Bank
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Exact name in bank account"
+                      value={bankAccountName}
+                      onChange={(e) => setBankAccountName(e.target.value)}
+                      className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                      Name of Bank
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. HDFC Bank / ICICI Bank"
+                      value={bankName}
+                      onChange={(e) => setBankName(e.target.value)}
+                      className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                      Bank Branch
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Connaught Place Branch"
+                      value={bankBranch}
+                      onChange={(e) => setBankBranch(e.target.value)}
+                      className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                      Account Number
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. 50100234567890"
+                      value={bankAccountNumber}
+                      onChange={(e) => setBankAccountNumber(e.target.value)}
+                      className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-mono"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                      IFSC Code
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. HDFC0001234"
+                      value={bankIfsc}
+                      onChange={(e) => setBankIfsc(e.target.value.toUpperCase())}
+                      className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-mono uppercase"
+                    />
+                  </div>
+                </div>
               </div>
 
               <div className="pt-4 border-t border-slate-200 flex items-center justify-end space-x-2">
@@ -444,7 +732,7 @@ export default function EmployeeManagement({
                   disabled={formLoading}
                   className="px-5 py-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition shadow-sm disabled:opacity-50"
                 >
-                  {formLoading ? "Creating..." : "Create Employee Account"}
+                  {formLoading ? "Creating..." : "Save & Create Profile"}
                 </button>
               </div>
             </form>
@@ -455,8 +743,8 @@ export default function EmployeeManagement({
       {/* Edit Employee Modal */}
       {editingEmployee && (
         <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-md w-full overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-slate-50">
+          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-2xl w-full overflow-hidden animate-in fade-in zoom-in-95 duration-200 max-h-[92vh] flex flex-col">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-slate-50 flex-shrink-0">
               <div className="flex items-center space-x-2">
                 <Pencil className="w-4 h-4 text-blue-600" />
                 <h3 className="text-base font-bold text-slate-900">Edit Employee Details</h3>
@@ -469,7 +757,7 @@ export default function EmployeeManagement({
               </button>
             </div>
 
-            <form onSubmit={handleUpdateEmployee} className="p-6 space-y-3.5">
+            <form onSubmit={handleUpdateEmployee} className="p-6 space-y-4 text-xs overflow-y-auto">
               {editError && (
                 <div className="bg-rose-50 border border-rose-200 text-rose-700 text-xs p-3 rounded-lg flex items-center gap-2">
                   <AlertCircle className="w-4 h-4 flex-shrink-0" />
@@ -477,101 +765,247 @@ export default function EmployeeManagement({
                 </div>
               )}
 
+              {/* Section 1: Account Particulars */}
               <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
-                  Full Name <span className="text-rose-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={editName}
-                  onChange={(e) => setEditName(e.target.value)}
-                  className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-                />
-              </div>
+                <h4 className="font-bold text-slate-800 text-[11px] uppercase tracking-wider mb-2.5 pb-1 border-b border-slate-100">
+                  1. Login &amp; Workspace Account
+                </h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                      Full Name <span className="text-rose-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={editName}
+                      onChange={(e) => setEditName(e.target.value)}
+                      className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                    />
+                  </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
-                    Login User ID <span className="text-rose-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={editUserId}
-                    onChange={(e) => setEditUserId(e.target.value)}
-                    className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-mono"
-                  />
-                  <p className="text-[10px] text-slate-400 mt-0.5">Used for login.</p>
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                      Login User ID <span className="text-rose-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={editUserId}
+                      onChange={(e) => setEditUserId(e.target.value)}
+                      className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-mono"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                      Gmail Account <span className="text-rose-500">*</span>
+                    </label>
+                    <input
+                      type="email"
+                      required
+                      value={editEmail}
+                      onChange={(e) => setEditEmail(e.target.value)}
+                      className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-mono"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                      Designation
+                    </label>
+                    <input
+                      type="text"
+                      value={editDesignation}
+                      onChange={(e) => setEditDesignation(e.target.value)}
+                      className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                      Role Access
+                    </label>
+                    <select
+                      value={editRole}
+                      onChange={(e) => setEditRole(e.target.value)}
+                      className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-medium bg-white"
+                    >
+                      <option value="EMPLOYEE">Employee</option>
+                      <option value="ADMIN">Admin</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                      Reset Password <span className="text-slate-400 font-normal">(Optional)</span>
+                    </label>
+                    <div className="relative">
+                      <input
+                        type={showEditPassword ? "text" : "password"}
+                        placeholder="Leave blank to keep existing"
+                        value={editPassword}
+                        onChange={(e) => setEditPassword(e.target.value)}
+                        className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none pr-8 font-mono"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowEditPassword(!showEditPassword)}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                      >
+                        {showEditPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                      </button>
+                    </div>
+                  </div>
                 </div>
+              </div>
 
-                <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
-                    Role Access
-                  </label>
-                  <select
-                    value={editRole}
-                    onChange={(e) => setEditRole(e.target.value)}
-                    className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-medium bg-white"
-                  >
-                    <option value="EMPLOYEE">Employee</option>
-                    <option value="ADMIN">Admin</option>
-                  </select>
-                  <p className="text-[10px] text-slate-400 mt-0.5">Workspace permission level.</p>
+              {/* Section 2: Contact, Statutory & Compensation */}
+              <div>
+                <h4 className="font-bold text-slate-800 text-[11px] uppercase tracking-wider mb-2.5 pb-1 border-b border-slate-100">
+                  2. Contact &amp; Compensation Particulars
+                </h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                      Phone Number
+                    </label>
+                    <input
+                      type="tel"
+                      value={editPhone}
+                      onChange={(e) => setEditPhone(e.target.value)}
+                      className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                      PAN Number
+                    </label>
+                    <input
+                      type="text"
+                      value={editPanNumber}
+                      onChange={(e) => setEditPanNumber(e.target.value.toUpperCase())}
+                      className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-mono uppercase"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                      Joining Date
+                    </label>
+                    <input
+                      type="date"
+                      value={editJoiningDate}
+                      onChange={(e) => setEditJoiningDate(e.target.value)}
+                      className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-medium"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                      Monthly Salary (₹ CTC)
+                    </label>
+                    <input
+                      type="number"
+                      value={editSalary}
+                      onChange={(e) => setEditSalary(e.target.value)}
+                      className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-bold"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                      Hourly Rate (₹/hr for OT)
+                    </label>
+                    <input
+                      type="number"
+                      value={editHourlyRate}
+                      onChange={(e) => setEditHourlyRate(e.target.value)}
+                      className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                    />
+                  </div>
+
+                  <div className="sm:col-span-2">
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                      Residential Address
+                    </label>
+                    <input
+                      type="text"
+                      value={editAddress}
+                      onChange={(e) => setEditAddress(e.target.value)}
+                      className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                    />
+                  </div>
                 </div>
               </div>
 
+              {/* Section 3: Bank Details */}
               <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
-                  Gmail Account <span className="text-rose-500">*</span>
-                </label>
-                <input
-                  type="email"
-                  required
-                  value={editEmail}
-                  onChange={(e) => setEditEmail(e.target.value)}
-                  className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-mono"
-                />
-                <p className="text-[10px] text-slate-400 mt-0.5">
-                  Daily reports and automated summaries are dispatched to this address.
-                </p>
-              </div>
+                <h4 className="font-bold text-slate-800 text-[11px] uppercase tracking-wider mb-2.5 pb-1 border-b border-slate-100">
+                  3. Bank Details (For Payslips &amp; Direct Deposit)
+                </h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                      Emp Name as per Bank
+                    </label>
+                    <input
+                      type="text"
+                      value={editBankAccountName}
+                      onChange={(e) => setEditBankAccountName(e.target.value)}
+                      className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                    />
+                  </div>
 
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
-                  Designation / Role Title
-                </label>
-                <input
-                  type="text"
-                  value={editDesignation}
-                  onChange={(e) => setEditDesignation(e.target.value)}
-                  className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-                />
-              </div>
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                      Name of Bank
+                    </label>
+                    <input
+                      type="text"
+                      value={editBankName}
+                      onChange={(e) => setEditBankName(e.target.value)}
+                      className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                    />
+                  </div>
 
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
-                  Reset Password <span className="text-slate-400 font-normal">(Optional)</span>
-                </label>
-                <div className="relative">
-                  <input
-                    type={showEditPassword ? "text" : "password"}
-                    placeholder="Leave blank to keep existing password"
-                    value={editPassword}
-                    onChange={(e) => setEditPassword(e.target.value)}
-                    className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none pr-8 font-mono"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowEditPassword(!showEditPassword)}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-                  >
-                    {showEditPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                  </button>
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                      Bank Branch
+                    </label>
+                    <input
+                      type="text"
+                      value={editBankBranch}
+                      onChange={(e) => setEditBankBranch(e.target.value)}
+                      className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                      Account Number
+                    </label>
+                    <input
+                      type="text"
+                      value={editBankAccountNumber}
+                      onChange={(e) => setEditBankAccountNumber(e.target.value)}
+                      className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-mono"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                      IFSC Code
+                    </label>
+                    <input
+                      type="text"
+                      value={editBankIfsc}
+                      onChange={(e) => setEditBankIfsc(e.target.value.toUpperCase())}
+                      className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-mono uppercase"
+                    />
+                  </div>
                 </div>
-                <p className="text-[10px] text-slate-400 mt-0.5">
-                  Only enter a value if you want to set a new password for this employee.
-                </p>
               </div>
 
               <div className="pt-4 border-t border-slate-200 flex items-center justify-end space-x-2">
@@ -594,7 +1028,17 @@ export default function EmployeeManagement({
           </div>
         </div>
       )}
+
+      {/* Salary Slip Modal */}
+      {salarySlipEmployee && (
+        <SalarySlipModal
+          isOpen={!!salarySlipEmployee}
+          onClose={() => setSalarySlipEmployee(null)}
+          employee={salarySlipEmployee}
+          allEmployees={employees}
+          currentUser={currentUser}
+        />
+      )}
     </div>
   );
 }
-

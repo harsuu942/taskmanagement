@@ -662,7 +662,7 @@ export default function AttendanceView({ currentUser, onRefresh }: AttendanceVie
             <div className="flex items-center space-x-2">
               <Calendar className="w-4 h-4 text-blue-600" />
               <h4 className="text-sm font-bold text-slate-800">
-                {isAdmin ? "Staff Attendance Roster" : "My Attendance History"}
+                {isAdmin ? "Staff Attendance Register" : "My Attendance History"}
               </h4>
               <span className="text-xs bg-blue-100 text-blue-800 font-bold px-2 py-0.5 rounded-full">
                 {roster.length} {roster.length === 1 ? (isAdmin ? "record" : "shift") : (isAdmin ? "records" : "shifts")}
@@ -686,7 +686,7 @@ export default function AttendanceView({ currentUser, onRefresh }: AttendanceVie
               <button
                 onClick={handleExportExcel}
                 className="flex items-center space-x-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition shadow-xs cursor-pointer"
-                title="Export current attendance roster to Excel"
+                title="Export current attendance register to Excel"
               >
                 <FileSpreadsheet className="w-3.5 h-3.5" />
                 <span>Download Excel</span>
@@ -694,7 +694,7 @@ export default function AttendanceView({ currentUser, onRefresh }: AttendanceVie
               <button
                 onClick={fetchAttendance}
                 className="p-1.5 text-slate-500 hover:text-slate-800 hover:bg-slate-200 rounded-lg transition cursor-pointer"
-                title="Refresh Roster"
+                title="Refresh Register"
               >
                 <RefreshCw className="w-4 h-4" />
               </button>

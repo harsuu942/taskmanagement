@@ -14,6 +14,17 @@ export async function GET() {
         role: true,
         designation: true,
         avatar: true,
+        phone: true,
+        panNumber: true,
+        address: true,
+        joiningDate: true,
+        salary: true,
+        hourlyRate: true,
+        bankAccountName: true,
+        bankName: true,
+        bankBranch: true,
+        bankAccountNumber: true,
+        bankIfsc: true,
         createdAt: true,
         assignedTasks: {
           select: {
@@ -42,7 +53,25 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { name, email, designation, role = "EMPLOYEE", userId, password } = body;
+    const {
+      name,
+      email,
+      designation,
+      role = "EMPLOYEE",
+      userId,
+      password,
+      phone,
+      panNumber,
+      address,
+      joiningDate,
+      salary,
+      hourlyRate,
+      bankAccountName,
+      bankName,
+      bankBranch,
+      bankAccountNumber,
+      bankIfsc,
+    } = body;
 
     if (!name || !email) {
       return NextResponse.json(
@@ -97,6 +126,17 @@ export async function POST(request: Request) {
         designation: designation?.trim() || "Team Member",
         role,
         avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(name.trim())}`,
+        phone: phone?.trim() || null,
+        panNumber: panNumber?.trim()?.toUpperCase() || null,
+        address: address?.trim() || null,
+        joiningDate: joiningDate ? new Date(joiningDate) : null,
+        salary: salary ? parseFloat(salary) : 0,
+        hourlyRate: hourlyRate ? parseFloat(hourlyRate) : 0,
+        bankAccountName: bankAccountName?.trim() || null,
+        bankName: bankName?.trim() || null,
+        bankBranch: bankBranch?.trim() || null,
+        bankAccountNumber: bankAccountNumber?.trim() || null,
+        bankIfsc: bankIfsc?.trim()?.toUpperCase() || null,
       },
       select: {
         id: true,
@@ -106,6 +146,17 @@ export async function POST(request: Request) {
         role: true,
         designation: true,
         avatar: true,
+        phone: true,
+        panNumber: true,
+        address: true,
+        joiningDate: true,
+        salary: true,
+        hourlyRate: true,
+        bankAccountName: true,
+        bankName: true,
+        bankBranch: true,
+        bankAccountNumber: true,
+        bankIfsc: true,
         createdAt: true,
       },
     });
@@ -119,7 +170,26 @@ export async function POST(request: Request) {
 export async function PUT(request: Request) {
   try {
     const body = await request.json();
-    const { id, name, email, designation, role, userId, password } = body;
+    const {
+      id,
+      name,
+      email,
+      designation,
+      role,
+      userId,
+      password,
+      phone,
+      panNumber,
+      address,
+      joiningDate,
+      salary,
+      hourlyRate,
+      bankAccountName,
+      bankName,
+      bankBranch,
+      bankAccountNumber,
+      bankIfsc,
+    } = body;
 
     if (!id) {
       return NextResponse.json({ error: "Employee ID is required." }, { status: 400 });
@@ -184,6 +254,17 @@ export async function PUT(request: Request) {
       userId: cleanUserId,
       designation: designation?.trim() || "Team Member",
       role: role || existingUser.role,
+      phone: phone !== undefined ? (phone?.trim() || null) : existingUser.phone,
+      panNumber: panNumber !== undefined ? (panNumber?.trim()?.toUpperCase() || null) : existingUser.panNumber,
+      address: address !== undefined ? (address?.trim() || null) : existingUser.address,
+      joiningDate: joiningDate !== undefined ? (joiningDate ? new Date(joiningDate) : null) : existingUser.joiningDate,
+      salary: salary !== undefined ? (parseFloat(salary) || 0) : existingUser.salary,
+      hourlyRate: hourlyRate !== undefined ? (parseFloat(hourlyRate) || 0) : existingUser.hourlyRate,
+      bankAccountName: bankAccountName !== undefined ? (bankAccountName?.trim() || null) : existingUser.bankAccountName,
+      bankName: bankName !== undefined ? (bankName?.trim() || null) : existingUser.bankName,
+      bankBranch: bankBranch !== undefined ? (bankBranch?.trim() || null) : existingUser.bankBranch,
+      bankAccountNumber: bankAccountNumber !== undefined ? (bankAccountNumber?.trim() || null) : existingUser.bankAccountNumber,
+      bankIfsc: bankIfsc !== undefined ? (bankIfsc?.trim()?.toUpperCase() || null) : existingUser.bankIfsc,
     };
 
     if (password && password.trim()) {
@@ -201,6 +282,17 @@ export async function PUT(request: Request) {
         role: true,
         designation: true,
         avatar: true,
+        phone: true,
+        panNumber: true,
+        address: true,
+        joiningDate: true,
+        salary: true,
+        hourlyRate: true,
+        bankAccountName: true,
+        bankName: true,
+        bankBranch: true,
+        bankAccountNumber: true,
+        bankIfsc: true,
         createdAt: true,
       },
     });

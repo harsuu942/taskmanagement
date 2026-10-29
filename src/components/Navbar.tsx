@@ -156,14 +156,14 @@ export default function Navbar({
     },
     {
       id: "attendance",
-      label: isAdmin ? "Attendance Roster" : "My Attendance",
+      label: isAdmin ? "Attendance Register" : "My Attendance",
       icon: Clock,
       activeColor: "bg-gradient-to-r from-teal-600 to-cyan-600 text-white shadow-md shadow-teal-500/20 border-teal-600",
       inactiveColor: "text-slate-600 hover:text-teal-700 hover:bg-teal-50/80",
     },
     {
       id: "reports",
-      label: "EOD Reports & Gmail",
+      label: "Reports",
       adminOnly: true, // Only visible to Admin
       icon: FileSpreadsheet,
       activeColor: "bg-gradient-to-r from-amber-500 to-orange-600 text-white shadow-md shadow-amber-500/20 border-amber-500",
@@ -171,7 +171,7 @@ export default function Navbar({
     },
     {
       id: "employees",
-      label: "Team Directory",
+      label: "Employee's list",
       adminOnly: true, // Only visible to Admin
       icon: Users,
       activeColor: "bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-md shadow-purple-500/20 border-purple-600",
@@ -179,7 +179,7 @@ export default function Navbar({
     },
     {
       id: "leaves",
-      label: isAdmin ? "Leave Requests & Reports" : "Apply & My Leaves",
+      label: "Leave Management",
       icon: CalendarDays,
       activeColor: "bg-gradient-to-r from-rose-600 to-amber-600 text-white shadow-md shadow-rose-500/20 border-rose-600",
       inactiveColor: "text-slate-600 hover:text-rose-700 hover:bg-rose-50/80",

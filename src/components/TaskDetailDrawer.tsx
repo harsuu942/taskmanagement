@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Task, User, TimeLog, Client, PriorityType, RecurrenceType, TaskProof } from "@/types";
+import { Task, User, TimeLog, Client, PriorityType, RecurrenceType, TaskProof, AttendanceRosterItem } from "@/types";
 import {
   X,
   Play,
@@ -38,6 +38,7 @@ interface TaskDetailDrawerProps {
   currentUser: User | null;
   allUsers: User[];
   clients?: Client[];
+  userAttendance?: AttendanceRosterItem | null;
   onTimerAction: (taskId: string, action: "start" | "hold" | "resume" | "stop" | "complete") => Promise<void>;
   onAdminApprove: (taskId: string) => Promise<void>;
   onAdminRevision: (taskId: string) => Promise<void>;
@@ -52,6 +53,7 @@ export default function TaskDetailDrawer({
   currentUser,
   allUsers,
   clients = [],
+  userAttendance,
   onTimerAction,
   onAdminApprove,
   onAdminRevision,
@@ -309,6 +311,10 @@ export default function TaskDetailDrawer({
   const isCreatedByMe = task.createdById === currentUser?.id;
   const isAssignedToMe = task.assignedToId === currentUser?.id;
   const isFinalComplete = task.adminStatus === "FINAL_COMPLETED";
+  const isCheckedIn = !userAttendance || isAdmin || (
+    userAttendance.status === "PRESENT" ||
+    (!!userAttendance.checkInTime && !userAttendance.checkOutTime && !userAttendance.isOnBreak && userAttendance.status !== "CHECKED_OUT")
+  );
 
   // Permission policy:
   // Employees can edit tasks assigned to them OR created by them. Admins can edit any task.
@@ -976,7 +982,7 @@ export default function TaskDetailDrawer({
                   <>
                     <button
                       onClick={() => onTimerAction(task.id, "hold")}
-                      className="bg-amber-500 hover:bg-amber-600 text-slate-950 px-4 py-2 rounded-xl text-xs font-bold transition flex items-center space-x-1.5 shadow-md shadow-amber-500/20"
+                      className="bg-amber-500 hover:bg-amber-600 text-slate-950 px-4 py-2 rounded-xl text-xs font-bold transition flex items-center space-x-1.5 shadow-md shadow-amber-500/20 cursor-pointer"
                     >
                       <Pause className="w-4 h-4 fill-current" />
                       <span>Hold Timer</span>
@@ -984,7 +990,7 @@ export default function TaskDetailDrawer({
 
                     <button
                       onClick={() => onTimerAction(task.id, "complete")}
-                      className="bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2 rounded-xl text-xs font-bold transition flex items-center space-x-1.5 shadow-md shadow-emerald-500/20"
+                      className="bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2 rounded-xl text-xs font-bold transition flex items-center space-x-1.5 shadow-md shadow-emerald-500/20 cursor-pointer"
                     >
                       <CheckCircle2 className="w-4 h-4" />
                       <span>Complete Task</span>
@@ -992,16 +998,38 @@ export default function TaskDetailDrawer({
                   </>
                 ) : task.employeeStatus === "ON_HOLD" ? (
                   <button
-                    onClick={() => onTimerAction(task.id, "resume")}
-                    className="bg-blue-600 hover:bg-blue-500 text-white px-5 py-2 rounded-xl text-xs font-bold transition flex items-center space-x-1.5 shadow-md shadow-blue-500/30"
+                    disabled={!isCheckedIn}
+                    onClick={() => {
+                      if (!isCheckedIn) {
+                        alert("You cannot resume task work without checking in. Please check in in the Attendance Register first.");
+                        return;
+                      }
+                      onTimerAction(task.id, "resume");
+                    }}
+                    className={`px-5 py-2 rounded-xl text-xs font-bold transition flex items-center space-x-1.5 shadow-md ${
+                      !isCheckedIn
+                        ? "bg-slate-700 text-slate-400 opacity-60 cursor-not-allowed"
+                        : "bg-blue-600 hover:bg-blue-500 text-white shadow-blue-500/30 cursor-pointer"
+                    }`}
                   >
                     <Play className="w-4 h-4 fill-current" />
                     <span>Resume Work</span>
                   </button>
                 ) : (
                   <button
-                    onClick={() => onTimerAction(task.id, "start")}
-                    className="bg-blue-600 hover:bg-blue-500 text-white px-5 py-2 rounded-xl text-xs font-bold transition flex items-center space-x-1.5 shadow-md shadow-blue-500/30"
+                    disabled={!isCheckedIn}
+                    onClick={() => {
+                      if (!isCheckedIn) {
+                        alert("You cannot start task work without checking in. Please check in in the Attendance Register first.");
+                        return;
+                      }
+                      onTimerAction(task.id, "start");
+                    }}
+                    className={`px-5 py-2 rounded-xl text-xs font-bold transition flex items-center space-x-1.5 shadow-md ${
+                      !isCheckedIn
+                        ? "bg-slate-700 text-slate-400 opacity-60 cursor-not-allowed"
+                        : "bg-blue-600 hover:bg-blue-500 text-white shadow-blue-500/30 cursor-pointer"
+                    }`}
                   >
                     <Play className="w-4 h-4 fill-current" />
                     <span>Start Timer</span>
@@ -1009,6 +1037,16 @@ export default function TaskDetailDrawer({
                 )}
               </div>
             </div>
+
+            {/* Check-in requirement alert if user is employee and not checked in */}
+            {!isCheckedIn && !isFinalComplete && (
+              <div className="mt-2 p-2.5 bg-rose-950/70 border border-rose-500/40 rounded-xl text-rose-300 text-xs flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
+                <span>
+                  Check-in required: Please submit <strong>Check-In</strong> in the Attendance Register before starting a task timer.
+                </span>
+              </div>
+            )}
 
             {/* Admin Direct Duration Override Form */}
             {showAdminTimeEdit && isAdmin && (

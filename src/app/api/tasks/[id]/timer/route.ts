@@ -24,8 +24,32 @@ export async function POST(
 
     const now = new Date();
     let updatedTotalSeconds = task.totalDurationSeconds || 0;
+    const effectiveUserId = userId || task.assignedToId || task.createdById;
 
     if (action === "start" || action === "resume") {
+      // Guard: Cannot start a task without check-in
+      const todayStr = now.toISOString().slice(0, 10);
+      const attendance = await prisma.attendance.findUnique({
+        where: { userId_date: { userId: effectiveUserId, date: todayStr } },
+      });
+
+      const isCheckedIn =
+        attendance &&
+        attendance.checkInTime &&
+        attendance.status !== "CHECKED_OUT" &&
+        attendance.status !== "ON_BREAK" &&
+        !attendance.isOnBreak;
+
+      if (!isCheckedIn) {
+        return NextResponse.json(
+          {
+            error:
+              "You cannot start or resume a task timer without checking in. Please check in first in the Attendance Register.",
+          },
+          { status: 403 }
+        );
+      }
+
       // If already running, do not duplicate
       if (task.isTimerRunning) {
         return NextResponse.json({

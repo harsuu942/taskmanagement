@@ -238,11 +238,14 @@ export default function Home() {
           userId: currentUser?.id,
         }),
       });
+      const data = await res.json();
       if (res.ok) {
         await fetchTasks();
+      } else {
+        alert(data.error || "Failed to perform timer action.");
       }
-    } catch (e) {
-      console.error(e);
+    } catch (e: any) {
+      alert(e.message || "Network error occurred.");
     }
   };
 
@@ -543,6 +546,7 @@ export default function Home() {
         currentUser={currentUser}
         allUsers={allUsers}
         clients={clients}
+        userAttendance={userAttendance}
         onTimerAction={handleTimerAction}
         onAdminApprove={handleAdminApprove}
         onAdminRevision={handleAdminRevision}
