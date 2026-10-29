@@ -536,15 +536,15 @@ export default function SettingsModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4"
+      className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4"
       onClick={onClose}
     >
       <div
-        className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-2xl w-full overflow-hidden animate-in fade-in zoom-in-95 duration-200"
+        className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-2xl w-full max-h-[92vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200 my-auto"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-slate-50">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-slate-50 shrink-0">
           <div className="flex items-center space-x-2">
             <KeyRound className="w-5 h-5 text-blue-600" />
             <h3 className="text-base font-bold text-slate-900">
@@ -566,7 +566,7 @@ export default function SettingsModal({
         </div>
 
         {/* Setting Tabs */}
-        <div className="flex border-b border-slate-200 bg-slate-100/70 p-1.5 gap-1 overflow-x-auto">
+        <div className="flex border-b border-slate-200 bg-slate-100/70 p-1.5 gap-1 overflow-x-auto shrink-0">
           <button
             type="button"
             onClick={() => setActiveTab("password")}
@@ -639,7 +639,7 @@ export default function SettingsModal({
 
         {/* TAB 1: CHANGE PASSWORD */}
         {activeTab === "password" && (
-          <form onSubmit={handleChangePassword} className="p-6 space-y-4 text-xs">
+          <form onSubmit={handleChangePassword} className="p-6 space-y-4 text-xs overflow-y-auto flex-1">
             {/* Account Info Pill */}
             <div className="p-3 bg-blue-50/70 border border-blue-200 rounded-xl flex items-center justify-between">
               <div>
@@ -739,7 +739,7 @@ export default function SettingsModal({
               />
             </div>
 
-            <div className="pt-4 border-t border-slate-200 flex items-center justify-end space-x-2">
+            <div className="sticky bottom-0 -mx-6 -mb-6 px-6 py-3.5 bg-white/95 backdrop-blur-xs border-t border-slate-200 flex items-center justify-end space-x-2 z-10">
               <button
                 type="button"
                 onClick={onClose}
@@ -761,7 +761,7 @@ export default function SettingsModal({
 
         {/* TAB 2: GMAIL SETTINGS (Admin Only) */}
         {activeTab === "gmail" && isAdmin && (
-          <form onSubmit={handleSaveGmail} className="p-6 space-y-4 text-xs">
+          <form onSubmit={handleSaveGmail} className="p-6 space-y-4 text-xs overflow-y-auto flex-1">
             {gmailMessage && (
               <div
                 className={`p-3 rounded-lg font-medium flex items-center gap-2 ${
@@ -883,7 +883,7 @@ export default function SettingsModal({
             </div>
 
             {/* Action Buttons */}
-            <div className="pt-4 border-t border-slate-200 flex items-center justify-between flex-wrap gap-2">
+            <div className="sticky bottom-0 -mx-6 -mb-6 px-6 py-3.5 bg-white/95 backdrop-blur-xs border-t border-slate-200 flex items-center justify-between flex-wrap gap-2 z-10">
               <button
                 type="button"
                 onClick={handleTestEmail}
@@ -917,7 +917,7 @@ export default function SettingsModal({
 
         {/* TAB 3: LEAVE TYPES & QUOTAS */}
         {activeTab === "leave" && (
-          <form onSubmit={handleSaveLeave} className="p-6 space-y-4 text-xs">
+          <form onSubmit={handleSaveLeave} className="p-6 space-y-4 text-xs overflow-y-auto flex-1">
             {leaveMessage && (
               <div
                 className={`p-3 rounded-lg text-xs flex items-center space-x-2 ${
@@ -1129,7 +1129,7 @@ export default function SettingsModal({
             </div>
 
             {/* Actions */}
-            <div className="pt-4 border-t border-slate-200 flex items-center justify-end space-x-2">
+            <div className="sticky bottom-0 -mx-6 -mb-6 px-6 py-3.5 bg-white/95 backdrop-blur-xs border-t border-slate-200 flex items-center justify-end space-x-2 z-10">
               <button
                 type="button"
                 onClick={onClose}
@@ -1151,7 +1151,7 @@ export default function SettingsModal({
 
         {/* TAB 4: SALARY & DEDUCTION COMPONENTS */}
         {activeTab === "salary" && (
-          <form onSubmit={handleSaveSalary} className="p-6 space-y-4 text-xs">
+          <form onSubmit={handleSaveSalary} className="p-6 space-y-4 text-xs overflow-y-auto flex-1">
             {salaryMessage && (
               <div
                 className={`p-3 rounded-lg text-xs flex items-center space-x-2 ${
@@ -1492,7 +1492,7 @@ export default function SettingsModal({
             </div>
 
             {/* Actions */}
-            <div className="pt-4 border-t border-slate-200 flex items-center justify-end space-x-2">
+            <div className="sticky bottom-0 -mx-6 -mb-6 px-6 py-3.5 bg-white/95 backdrop-blur-xs border-t border-slate-200 flex items-center justify-end space-x-2 z-10">
               <button
                 type="button"
                 onClick={onClose}
@@ -1514,7 +1514,7 @@ export default function SettingsModal({
 
         {/* TAB 5: WORK POLICY & SUNDAY OT */}
         {activeTab === "policy" && (
-          <form onSubmit={handleSavePolicy} className="p-6 space-y-4 text-xs">
+          <form onSubmit={handleSavePolicy} className="p-6 space-y-4 text-xs overflow-y-auto flex-1">
             {policyMessage && (
               <div
                 className={`p-3 rounded-lg text-xs flex items-center space-x-2 ${
@@ -1607,7 +1607,7 @@ export default function SettingsModal({
             </div>
 
             {/* Actions */}
-            <div className="pt-4 border-t border-slate-200 flex items-center justify-end space-x-2">
+            <div className="sticky bottom-0 -mx-6 -mb-6 px-6 py-3.5 bg-white/95 backdrop-blur-xs border-t border-slate-200 flex items-center justify-end space-x-2 z-10">
               <button
                 type="button"
                 onClick={onClose}

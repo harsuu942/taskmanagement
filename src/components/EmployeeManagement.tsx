@@ -1210,15 +1210,15 @@ export default function EmployeeManagement({
       {/* Admin Salary Components Modal: Set Earning & Deduction Components */}
       {showSalaryComponentsModal && (
         <div
-          className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150"
+          className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-150"
           onClick={() => setShowSalaryComponentsModal(false)}
         >
           <div
-            className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-2xl w-full overflow-hidden"
+            className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-2xl w-full max-h-[92vh] flex flex-col overflow-hidden my-auto"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Modal Header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-gradient-to-r from-emerald-800 to-teal-800 text-white">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-gradient-to-r from-emerald-800 to-teal-800 text-white shrink-0">
               <div className="flex items-center space-x-2.5">
                 <Coins className="w-5 h-5 text-emerald-300" />
                 <div>
@@ -1240,7 +1240,7 @@ export default function EmployeeManagement({
             </div>
 
             {/* Modal Body */}
-            <form onSubmit={handleSaveSalaryComponents} className="p-6 space-y-4 text-xs max-h-[80vh] overflow-y-auto">
+            <form onSubmit={handleSaveSalaryComponents} className="p-6 space-y-4 text-xs overflow-y-auto flex-1">
               {compMessage && (
                 <div
                   className={`p-3 rounded-xl border flex items-center space-x-2 ${
@@ -1581,7 +1581,7 @@ export default function EmployeeManagement({
               </div>
 
               {/* Action Buttons */}
-              <div className="pt-3 border-t border-slate-200 flex items-center justify-end space-x-2">
+              <div className="sticky bottom-0 -mx-6 -mb-6 px-6 py-3.5 bg-white/95 backdrop-blur-xs border-t border-slate-200 flex items-center justify-end space-x-2 z-10">
                 <button
                   type="button"
                   onClick={() => setShowSalaryComponentsModal(false)}
