@@ -24,6 +24,8 @@ export async function GET() {
     const companyDailyHours = parseFloat(settingsMap["COMPANY_DAILY_HOURS"] || "8");
     const enableSundayOt = settingsMap["ENABLE_SUNDAY_OT"] !== "false";
     const standardWorkDays = parseInt(settingsMap["STANDARD_WORK_DAYS"] || "26");
+    const annualLeaveQuota = parseFloat(settingsMap["ANNUAL_LEAVE_QUOTA"] || "18");
+    const earnedLeaveAccrual = parseFloat(settingsMap["EARNED_LEAVE_ACCRUAL"] || "1.5");
 
     return NextResponse.json({
       settings: {
@@ -35,6 +37,8 @@ export async function GET() {
         companyDailyHours,
         enableSundayOt,
         standardWorkDays,
+        annualLeaveQuota,
+        earnedLeaveAccrual,
       },
     });
   } catch (error: any) {
@@ -54,6 +58,8 @@ export async function POST(request: Request) {
       companyDailyHours,
       enableSundayOt,
       standardWorkDays,
+      annualLeaveQuota,
+      earnedLeaveAccrual,
     } = body;
 
     // Optional Action: Test Gmail SMTP Connection
@@ -131,6 +137,22 @@ export async function POST(request: Request) {
         where: { key: "STANDARD_WORK_DAYS" },
         create: { key: "STANDARD_WORK_DAYS", value: String(standardWorkDays) },
         update: { value: String(standardWorkDays) },
+      });
+    }
+
+    if (annualLeaveQuota !== undefined) {
+      await prisma.systemSetting.upsert({
+        where: { key: "ANNUAL_LEAVE_QUOTA" },
+        create: { key: "ANNUAL_LEAVE_QUOTA", value: String(annualLeaveQuota) },
+        update: { value: String(annualLeaveQuota) },
+      });
+    }
+
+    if (earnedLeaveAccrual !== undefined) {
+      await prisma.systemSetting.upsert({
+        where: { key: "EARNED_LEAVE_ACCRUAL" },
+        create: { key: "EARNED_LEAVE_ACCRUAL", value: String(earnedLeaveAccrual) },
+        update: { value: String(earnedLeaveAccrual) },
       });
     }
 

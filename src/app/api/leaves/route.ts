@@ -127,16 +127,27 @@ export async function GET(request: Request) {
       .reduce((acc, l) => acc + (l.daysCount || 1), 0);
 
     const totalPaidTaken = parseFloat((casualTaken + sickTaken + earnedTaken).toFixed(2));
-    const totalAnnualQuota = 18;
+    
+    // Fetch dynamic annual leave quota set by Admin
+    const quotaSetting = await prisma.systemSetting.findUnique({
+      where: { key: "ANNUAL_LEAVE_QUOTA" },
+    });
+    const accrualSetting = await prisma.systemSetting.findUnique({
+      where: { key: "EARNED_LEAVE_ACCRUAL" },
+    });
+    const totalAnnualQuota = quotaSetting ? parseFloat(quotaSetting.value) || 18 : 18;
+    const earnedLeaveAccrual = accrualSetting ? parseFloat(accrualSetting.value) || 1.5 : 1.5;
+
     const totalBalance = parseFloat(Math.max(0, totalAnnualQuota - totalPaidTaken).toFixed(2));
 
     const leaveSummary = [
       {
         leaveType: "EARNED",
         label: "Earned Leave (EL)",
-        totalAvailable: 18, // 1.5 days per month * 12 months = 18 days
+        totalAvailable: totalAnnualQuota, // e.g. 1.5 days/mo * 12 = 18 days
+        accrualRate: earnedLeaveAccrual,
         taken: parseFloat(earnedTaken.toFixed(2)),
-        balance: parseFloat(Math.max(0, 18 - earnedTaken).toFixed(2)),
+        balance: parseFloat(Math.max(0, totalAnnualQuota - earnedTaken).toFixed(2)),
       },
       {
         leaveType: "CASUAL",
@@ -162,7 +173,7 @@ export async function GET(request: Request) {
       {
         leaveType: "TOTAL",
         label: "Total Annual Quota",
-        totalAvailable: 18,
+        totalAvailable: totalAnnualQuota,
         taken: totalPaidTaken,
         balance: totalBalance,
       },

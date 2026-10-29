@@ -596,61 +596,76 @@ export default function AttendanceView({ currentUser, onRefresh }: AttendanceVie
           </div>
         </div>
 
-        {/* Action Buttons */}
-        <div className="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto">
-          {isOnBreak ? (
-            <>
-              <button
-                disabled={actionLoading}
-                onClick={() => handleAction("resume-break")}
-                className="w-full sm:w-auto bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-white font-bold px-5 py-3 rounded-xl text-sm transition shadow-lg shadow-amber-500/20 flex items-center justify-center space-x-2"
-              >
-                <Play className="w-4 h-4 fill-current" />
-                <span>Resume Work</span>
-              </button>
-              <button
-                disabled={actionLoading}
-                onClick={() => handleAction("check-out")}
-                className="w-full sm:w-auto bg-rose-500 hover:bg-rose-600 disabled:opacity-50 text-white font-bold px-5 py-3 rounded-xl text-sm transition shadow-lg shadow-rose-500/20 flex items-center justify-center space-x-2"
-              >
-                <LogOut className="w-4 h-4" />
-                <span>Submit Check-Out</span>
-              </button>
-            </>
-          ) : isCheckedIn ? (
-            <>
-              <button
-                disabled={actionLoading}
-                onClick={() => handleAction("break")}
-                className="w-full sm:w-auto bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-white font-bold px-5 py-3 rounded-xl text-sm transition shadow-lg shadow-amber-500/20 flex items-center justify-center space-x-2"
-                title="Take a break (Pauses work shift)"
-              >
-                <Coffee className="w-4 h-4" />
-                <span>Take Break</span>
-              </button>
-              <button
-                disabled={actionLoading}
-                onClick={() => handleAction("check-out")}
-                className="w-full sm:w-auto bg-rose-500 hover:bg-rose-600 disabled:opacity-50 text-white font-bold px-5 py-3 rounded-xl text-sm transition shadow-lg shadow-rose-500/20 flex items-center justify-center space-x-2"
-              >
-                <LogOut className="w-4 h-4" />
-                <span>Submit Check-Out</span>
-              </button>
-            </>
-          ) : (
-            <button
-              disabled={actionLoading}
-              onClick={() => handleAction("check-in")}
-              className={`w-full sm:w-auto ${
-                isCheckedOut
-                  ? "bg-indigo-600 hover:bg-indigo-700 shadow-indigo-500/20"
-                  : "bg-emerald-500 hover:bg-emerald-600 shadow-emerald-500/20"
-              } disabled:opacity-50 text-white font-bold px-6 py-3 rounded-xl text-sm transition shadow-lg flex items-center justify-center space-x-2 cursor-pointer`}
-            >
-              <LogIn className="w-4 h-4" />
-              <span>{isCheckedOut ? "Re-Check In / Resume Work" : "Submit Check-In"}</span>
-            </button>
-          )}
+        {/* Action Buttons: Check In, Break, Check Out (with Enabled/Disabled states) */}
+        <div className="flex flex-col sm:flex-row items-center gap-2.5 w-full md:w-auto">
+          {/* Button 1: Check In */}
+          <button
+            disabled={actionLoading || isCheckedIn || isOnBreak}
+            onClick={() => handleAction("check-in")}
+            className={`w-full sm:w-auto font-bold px-4 py-2.5 rounded-xl text-xs sm:text-sm transition flex items-center justify-center space-x-1.5 ${
+              isCheckedIn || isOnBreak
+                ? "bg-slate-700/40 text-slate-400 cursor-not-allowed border border-slate-600/40 opacity-50"
+                : "bg-emerald-500 hover:bg-emerald-600 text-white shadow-lg shadow-emerald-500/20 cursor-pointer active:scale-95"
+            }`}
+            title={
+              isCheckedIn
+                ? "Already checked in"
+                : isOnBreak
+                ? "Currently on break"
+                : isCheckedOut
+                ? "Click to re-check in & resume work"
+                : "Submit check-in for today"
+            }
+          >
+            <LogIn className="w-4 h-4" />
+            <span>{isCheckedIn ? "Checked In" : isCheckedOut ? "Re-Check In" : "Check In"}</span>
+          </button>
+
+          {/* Button 2: Break / Resume */}
+          <button
+            disabled={actionLoading || ((!isCheckedIn && !isOnBreak) || isCheckedOut)}
+            onClick={() => (isOnBreak ? handleAction("resume-break") : handleAction("break"))}
+            className={`w-full sm:w-auto font-bold px-4 py-2.5 rounded-xl text-xs sm:text-sm transition flex items-center justify-center space-x-1.5 ${
+              (!isCheckedIn && !isOnBreak) || isCheckedOut
+                ? "bg-slate-700/40 text-slate-400 cursor-not-allowed border border-slate-600/40 opacity-50"
+                : isOnBreak
+                ? "bg-amber-600 hover:bg-amber-700 text-white cursor-pointer shadow-lg animate-pulse active:scale-95"
+                : "bg-amber-500 hover:bg-amber-600 text-white cursor-pointer shadow-lg shadow-amber-500/20 active:scale-95"
+            }`}
+            title={
+              isOnBreak
+                ? "Click to resume work from break"
+                : isCheckedIn
+                ? "Take a break (pauses shift)"
+                : "Must check in before taking a break"
+            }
+          >
+            {isOnBreak ? (
+              <Play className="w-4 h-4 fill-current" />
+            ) : (
+              <Coffee className="w-4 h-4" />
+            )}
+            <span>{isOnBreak ? "Resume Work" : "Break"}</span>
+          </button>
+
+          {/* Button 3: Check Out */}
+          <button
+            disabled={actionLoading || (!isCheckedIn && !isOnBreak)}
+            onClick={() => handleAction("check-out")}
+            className={`w-full sm:w-auto font-bold px-4 py-2.5 rounded-xl text-xs sm:text-sm transition flex items-center justify-center space-x-1.5 ${
+              !isCheckedIn && !isOnBreak
+                ? "bg-slate-700/40 text-slate-400 cursor-not-allowed border border-slate-600/40 opacity-50"
+                : "bg-rose-500 hover:bg-rose-600 text-white cursor-pointer shadow-lg shadow-rose-500/20 active:scale-95"
+            }`}
+            title={
+              !isCheckedIn && !isOnBreak
+                ? "Not checked in"
+                : "Submit check-out and complete workday"
+            }
+          >
+            <LogOut className="w-4 h-4" />
+            <span>Check Out</span>
+          </button>
         </div>
       </div>
 

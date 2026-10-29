@@ -85,11 +85,27 @@ export default function LeavesView({
   const [importError, setImportError] = useState<string | null>(null);
   const [importSuccess, setImportSuccess] = useState<string | null>(null);
 
+  // View switcher: "leaves" (Leave Applications) vs "holidays" (Public Holiday Calendar)
+  const [activeMainTab, setActiveMainTab] = useState<"leaves" | "holidays">("leaves");
+
+  // Public Holiday Management State (Admin)
+  const [isHolidayModalOpen, setIsHolidayModalOpen] = useState(false);
+  const [holidayTab, setHolidayTab] = useState<"list" | "add" | "import">("list");
+  const [holidayName, setHolidayName] = useState("");
+  const [holidayDate, setHolidayDate] = useState(todayStr);
+  const [holidayDesc, setHolidayDesc] = useState("");
+  const [holidaySubmitting, setHolidaySubmitting] = useState(false);
+  const [holidayError, setHolidayError] = useState<string | null>(null);
+  const [holidayImportText, setHolidayImportText] = useState("");
+  const [holidayImportSubmitting, setHolidayImportSubmitting] = useState(false);
+  const [holidaySuccessMsg, setHolidaySuccessMsg] = useState<string | null>(null);
+
   // Admin Edit Leave State
   const [editLeaveModal, setEditLeaveModal] = useState<LeaveRequest | null>(null);
   const [editLeaveType, setEditLeaveType] = useState<LeaveType>("CASUAL");
   const [editLeaveStartDate, setEditLeaveStartDate] = useState(todayStr);
   const [editLeaveEndDate, setEditLeaveEndDate] = useState(todayStr);
+  const [editLeaveDaysCount, setEditLeaveDaysCount] = useState<number | string>(1);
   const [editLeaveReason, setEditLeaveReason] = useState("");
   const [editLeaveStatus, setEditLeaveStatus] = useState<LeaveStatus>("PENDING");
   const [editLeaveNotes, setEditLeaveNotes] = useState("");
@@ -101,6 +117,7 @@ export default function LeavesView({
     setEditLeaveType(l.leaveType);
     setEditLeaveStartDate(l.startDate);
     setEditLeaveEndDate(l.endDate);
+    setEditLeaveDaysCount(l.daysCount !== undefined && l.daysCount !== null ? l.daysCount : 1);
     setEditLeaveReason(l.reason);
     setEditLeaveStatus(l.status);
     setEditLeaveNotes(l.reviewNotes || "");
@@ -113,6 +130,7 @@ export default function LeavesView({
     setEditLeaveSubmitting(true);
     setEditLeaveError(null);
     try {
+      const parsedDays = parseFloat(String(editLeaveDaysCount));
       const res = await fetch(`/api/leaves/${editLeaveModal.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -120,6 +138,7 @@ export default function LeavesView({
           startDate: editLeaveStartDate,
           endDate: editLeaveEndDate,
           leaveType: editLeaveType,
+          daysCount: !isNaN(parsedDays) && parsedDays > 0 ? parsedDays : undefined,
           reason: editLeaveReason,
           status: editLeaveStatus,
           reviewNotes: editLeaveNotes,
@@ -135,6 +154,92 @@ export default function LeavesView({
       setEditLeaveError(err.message || "Failed to update leave");
     } finally {
       setEditLeaveSubmitting(false);
+    }
+  };
+
+  // Holiday Management Handlers
+  const handleAddHoliday = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!holidayName.trim() || !holidayDate) {
+      setHolidayError("Holiday Name and Date are required.");
+      return;
+    }
+    setHolidaySubmitting(true);
+    setHolidayError(null);
+    try {
+      const res = await fetch("/api/holidays", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: holidayName.trim(),
+          date: holidayDate,
+          description: holidayDesc.trim() || undefined,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to save holiday");
+      setHolidayName("");
+      setHolidayDesc("");
+      setHolidaySuccessMsg(`Added "${holidayName}" to official holiday calendar.`);
+      fetchLeaves();
+      setHolidayTab("list");
+    } catch (err: any) {
+      setHolidayError(err.message || "Failed to add holiday");
+    } finally {
+      setHolidaySubmitting(false);
+    }
+  };
+
+  const handleDeleteHoliday = async (id: string, name: string) => {
+    if (!confirm(`Are you sure you want to remove "${name}" from Public Holidays?`)) return;
+    try {
+      const res = await fetch(`/api/holidays?id=${id}`, { method: "DELETE" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to delete holiday");
+      fetchLeaves();
+    } catch (err: any) {
+      alert(err.message || "Failed to delete holiday");
+    }
+  };
+
+  const handleBulkImportHolidays = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!holidayImportText.trim()) return;
+    setHolidayImportSubmitting(true);
+    setHolidayError(null);
+    try {
+      const lines = holidayImportText.trim().split("\n");
+      const holidaysToImport: { date: string; name: string; description?: string }[] = [];
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed || (trimmed.toLowerCase().includes("date") && trimmed.toLowerCase().includes("name"))) continue;
+        const parts = trimmed.split(/[\t,|]+/).map((p) => p.trim());
+        if (parts.length >= 2) {
+          const d = parts[0];
+          const n = parts[1];
+          if (/^\d{4}-\d{2}-\d{2}$/.test(d) && n) {
+            holidaysToImport.push({ date: d, name: n, description: parts[2] || undefined });
+          }
+        }
+      }
+      if (holidaysToImport.length === 0) {
+        throw new Error("No valid holiday records found. Use format: YYYY-MM-DD | Holiday Name");
+      }
+      const res = await fetch("/api/holidays", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ holidays: holidaysToImport }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to import holidays");
+      setHolidayImportText("");
+      setHolidaySuccessMsg(`Successfully imported ${data.count || holidaysToImport.length} holidays to official calendar!`);
+      fetchLeaves();
+      setHolidayTab("list");
+    } catch (err: any) {
+      setHolidayError(err.message || "Failed to import holidays");
+    } finally {
+      setHolidayImportSubmitting(false);
     }
   };
 
@@ -501,7 +606,26 @@ export default function LeavesView({
         </div>
 
         {/* Action buttons */}
-        <div className="flex items-center gap-3 flex-wrap sm:flex-nowrap">
+        <div className="flex items-center gap-2.5 flex-wrap sm:flex-nowrap">
+          {isAdmin && (
+            <button
+              onClick={() => {
+                setHolidayError(null);
+                setHolidaySuccessMsg(null);
+                setHolidayTab("list");
+                setIsHolidayModalOpen(true);
+              }}
+              className="bg-purple-600 hover:bg-purple-500 text-white border border-purple-400/50 px-3.5 py-2.5 rounded-xl text-xs font-bold transition flex items-center space-x-1.5 shadow-md cursor-pointer"
+              title="Official Public Holiday Calendar (View, Add, Excel/PDF import)"
+            >
+              <Calendar className="w-4 h-4 text-purple-200" />
+              <span>🎉 Public Holiday Calendar</span>
+              <span className="bg-white/25 text-white px-1.5 py-0.2 rounded-full text-[10px] font-extrabold">
+                {holidaysList.length}
+              </span>
+            </button>
+          )}
+
           {isAdmin && (
             <button
               onClick={() => {
@@ -510,11 +634,11 @@ export default function LeavesView({
                 setImportSuccess(null);
                 setShowImportModal(true);
               }}
-              className="bg-white/20 hover:bg-white/30 text-white border border-white/30 px-3.5 py-2.5 rounded-xl text-xs font-bold transition flex items-center space-x-1.5"
+              className="bg-white/20 hover:bg-white/30 text-white border border-white/30 px-3.5 py-2.5 rounded-xl text-xs font-bold transition flex items-center space-x-1.5 cursor-pointer"
               title="Bulk import leave records from Excel, CSV, or PDF text"
             >
               <Upload className="w-4 h-4" />
-              <span>Import Leaves (Excel/PDF)</span>
+              <span>Import Leaves</span>
             </button>
           )}
 
@@ -530,7 +654,7 @@ export default function LeavesView({
               setApplyError(null);
               setIsApplyModalOpen(true);
             }}
-            className="bg-white hover:bg-rose-50 text-rose-900 px-4 py-2.5 rounded-xl text-xs font-extrabold shadow-md transition flex items-center space-x-1.5"
+            className="bg-white hover:bg-rose-50 text-rose-900 px-4 py-2.5 rounded-xl text-xs font-extrabold shadow-md transition flex items-center space-x-1.5 cursor-pointer"
           >
             <Plus className="w-4 h-4 text-rose-600" />
             <span>{isAdmin ? "Apply Leave (Staff / Self)" : "Apply for Leave"}</span>
@@ -538,8 +662,166 @@ export default function LeavesView({
         </div>
       </div>
 
-      {/* KPI Metrics Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* Main View Switcher: Leave Applications vs Official Public Holiday Calendar */}
+      <div className="flex border border-slate-200 bg-white rounded-xl p-1 shadow-2xs space-x-1 text-xs font-bold">
+        <button
+          onClick={() => setActiveMainTab("leaves")}
+          className={`flex-1 py-2.5 px-3 rounded-lg transition flex items-center justify-center space-x-2 cursor-pointer ${
+            activeMainTab === "leaves"
+              ? "bg-rose-50 text-rose-900 border border-rose-200 shadow-2xs"
+              : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
+          }`}
+        >
+          <CalendarDays className="w-4 h-4 text-rose-600" />
+          <span>Leave Applications</span>
+          <span className="bg-rose-100 text-rose-800 text-[10px] px-2 py-0.2 rounded-full">
+            {leaves.length}
+          </span>
+        </button>
+
+        <button
+          onClick={() => setActiveMainTab("holidays")}
+          className={`flex-1 py-2.5 px-3 rounded-lg transition flex items-center justify-center space-x-2 cursor-pointer ${
+            activeMainTab === "holidays"
+              ? "bg-purple-50 text-purple-900 border border-purple-200 shadow-2xs"
+              : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
+          }`}
+        >
+          <Calendar className="w-4 h-4 text-purple-600" />
+          <span>🎉 Official Public Holiday Calendar</span>
+          <span className="bg-purple-100 text-purple-800 text-[10px] px-2 py-0.2 rounded-full font-extrabold">
+            {holidaysList.length} Holidays
+          </span>
+        </button>
+      </div>
+
+      {activeMainTab === "holidays" ? (
+        /* Dedicated Public Holiday Calendar Panel */
+        <div className="bg-white rounded-2xl shadow-xs border border-slate-200 overflow-hidden space-y-4 p-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-slate-200 gap-4">
+            <div className="flex items-center space-x-3">
+              <div className="p-2.5 bg-purple-100 text-purple-700 rounded-xl">
+                <Calendar className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="text-base font-extrabold text-slate-900">
+                  🎉 Official Public Holidays Calendar ({holidaysList.length})
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Recognized national &amp; festive holidays. Attendance marks employees as &ldquo;Public Holiday&rdquo; (paid non-working day), and employee leave cannot conflict with these dates.
+                </p>
+              </div>
+            </div>
+
+            {isAdmin && (
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={() => {
+                    setHolidayError(null);
+                    setHolidaySuccessMsg(null);
+                    setHolidayTab("add");
+                    setIsHolidayModalOpen(true);
+                  }}
+                  className="bg-purple-600 hover:bg-purple-700 text-white px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center space-x-1.5 shadow-xs cursor-pointer"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Add Public Holiday</span>
+                </button>
+                <button
+                  onClick={() => {
+                    setHolidayError(null);
+                    setHolidaySuccessMsg(null);
+                    setHolidayTab("import");
+                    setIsHolidayModalOpen(true);
+                  }}
+                  className="bg-white hover:bg-purple-50 text-purple-800 border border-purple-300 px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center space-x-1.5 shadow-2xs cursor-pointer"
+                >
+                  <FileSpreadsheet className="w-3.5 h-3.5 text-purple-600" />
+                  <span>Import Excel / PDF</span>
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Holidays List */}
+          {holidaysList.length === 0 ? (
+            <div className="p-12 text-center text-slate-500 space-y-3">
+              <div className="w-12 h-12 bg-purple-100 text-purple-600 rounded-2xl flex items-center justify-center mx-auto">
+                <Calendar className="w-6 h-6" />
+              </div>
+              <h4 className="font-bold text-slate-800 text-sm">No Public Holidays added yet</h4>
+              <p className="text-xs text-slate-500 max-w-sm mx-auto">
+                Add national and festival holidays (Republic Day, Independence Day, Gandhi Jayanti, Diwali, etc.) or import your full annual calendar from Excel/PDF.
+              </p>
+              {isAdmin && (
+                <button
+                  onClick={() => {
+                    setHolidayTab("add");
+                    setIsHolidayModalOpen(true);
+                  }}
+                  className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg text-xs font-bold cursor-pointer"
+                >
+                  Add First Public Holiday
+                </button>
+              )}
+            </div>
+          ) : (
+            <div className="overflow-x-auto border border-slate-200 rounded-xl">
+              <table className="w-full text-left text-xs">
+                <thead>
+                  <tr className="bg-slate-50 text-slate-600 font-bold uppercase tracking-wider text-[10px] border-b border-slate-200">
+                    <th className="py-3 px-4">Date &amp; Day</th>
+                    <th className="py-3 px-4">Holiday Name</th>
+                    <th className="py-3 px-4">Description / Notes</th>
+                    <th className="py-3 px-4 text-center">Recognition</th>
+                    {isAdmin && <th className="py-3 px-4 text-right">Actions</th>}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {holidaysList.map((h: any) => {
+                    const d = new Date(h.date);
+                    const dayName = d.toLocaleDateString("en-US", { weekday: "long" });
+                    return (
+                      <tr key={h.id} className="hover:bg-slate-50/80 transition">
+                        <td className="py-3 px-4 font-mono font-bold text-slate-900 whitespace-nowrap">
+                          <div>{h.date}</div>
+                          <div className="text-[10px] text-purple-700 font-sans font-semibold">{dayName}</div>
+                        </td>
+                        <td className="py-3 px-4 font-bold text-slate-800">
+                          {h.name}
+                        </td>
+                        <td className="py-3 px-4 text-slate-500 italic">
+                          {h.description || "Official recognized public holiday"}
+                        </td>
+                        <td className="py-3 px-4 text-center">
+                          <span className="bg-purple-100 text-purple-800 text-[10px] font-bold px-2.5 py-0.5 rounded-full border border-purple-200">
+                            🌴 Official Paid Holiday
+                          </span>
+                        </td>
+                        {isAdmin && (
+                          <td className="py-3 px-4 text-right">
+                            <button
+                              onClick={() => handleDeleteHoliday(h.id, h.name)}
+                              className="p-1.5 bg-slate-100 hover:bg-rose-100 text-slate-500 hover:text-rose-700 rounded-lg transition cursor-pointer"
+                              title="Delete Holiday"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </td>
+                        )}
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      ) : (
+        /* Leave Applications Content */
+        <>
+          {/* KPI Metrics Cards */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Card 1: Pending */}
         <div className="bg-white rounded-xl shadow-xs border border-slate-200 p-4 flex items-center space-x-3.5">
           <div className="p-2.5 bg-amber-50 rounded-xl border border-amber-200 text-amber-600">
@@ -1021,6 +1303,8 @@ export default function LeavesView({
           </table>
         </div>
       </div>
+      </>
+      )}
 
       {/* MODAL 1: Apply for Leave Modal */}
       {isApplyModalOpen && (
@@ -1460,22 +1744,55 @@ export default function LeavesView({
                 </div>
               )}
 
-              {/* Leave Type */}
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
-                  Leave Type
-                </label>
-                <select
-                  value={editLeaveType}
-                  onChange={(e) => setEditLeaveType(e.target.value as LeaveType)}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white outline-none font-semibold text-slate-800"
-                >
-                  <option value="CASUAL">Casual Leave (General personal work)</option>
-                  <option value="SICK">Sick Leave (Medical/Health recovery)</option>
-                  <option value="EARNED">Earned / Privilege Leave</option>
-                  <option value="UNPAID">Unpaid Leave (Loss of Pay)</option>
-                  <option value="HALF_DAY">Half Day Leave (0.5 day)</option>
-                </select>
+              {/* Leave Type & Days Count */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                    Leave Type
+                  </label>
+                  <select
+                    value={editLeaveType}
+                    onChange={(e) => {
+                      const newType = e.target.value as LeaveType;
+                      setEditLeaveType(newType);
+                      if (newType === "HALF_DAY") {
+                        setEditLeaveDaysCount(0.5);
+                      }
+                    }}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white outline-none font-semibold text-slate-800"
+                  >
+                    <option value="CASUAL">Casual Leave (General personal work)</option>
+                    <option value="SICK">Sick Leave (Medical/Health recovery)</option>
+                    <option value="EARNED">Earned / Privilege Leave</option>
+                    <option value="UNPAID">Unpaid Leave (Loss of Pay)</option>
+                    <option value="HALF_DAY">Half Day Leave (0.5 day)</option>
+                    <option value="HOURLY">Hourly Short Leave</option>
+                  </select>
+                </div>
+
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-xs font-bold uppercase tracking-wider text-slate-700">
+                      Leave Count (Days) <span className="text-rose-500">*</span>
+                    </label>
+                    <span className="text-[10px] text-blue-600 font-bold">Admin Override</span>
+                  </div>
+                  <div className="flex items-center space-x-1.5">
+                    <input
+                      type="number"
+                      step="0.05"
+                      min="0.05"
+                      max="365"
+                      required
+                      value={editLeaveDaysCount}
+                      onChange={(e) => setEditLeaveDaysCount(e.target.value)}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none font-bold text-slate-900 bg-white focus:ring-2 focus:ring-blue-500"
+                    />
+                    <span className="text-xs font-bold text-slate-500 bg-slate-100 px-2.5 py-2 rounded-lg border border-slate-200">
+                      Day(s)
+                    </span>
+                  </div>
+                </div>
               </div>
 
               {/* Date Range */}
@@ -1568,6 +1885,273 @@ export default function LeavesView({
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 4: Admin Public Holiday Calendar Modal */}
+      {isHolidayModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4 overflow-y-auto">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full border border-slate-200 overflow-hidden my-8 animate-in fade-in zoom-in-95 duration-200">
+            {/* Header */}
+            <div className="bg-gradient-to-r from-purple-700 to-indigo-800 text-white p-5 flex items-center justify-between">
+              <div className="flex items-center space-x-2.5">
+                <Calendar className="w-5 h-5 text-purple-200" />
+                <div>
+                  <h3 className="font-extrabold text-base">🎉 Official Public Holiday Calendar</h3>
+                  <p className="text-xs text-purple-100">
+                    Recognized holidays show as &ldquo;Public Holiday&rdquo; (paid non-working day) and restrict leave requests.
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsHolidayModalOpen(false)}
+                className="text-white/80 hover:text-white p-1 rounded-lg hover:bg-white/10 transition cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Sub-tabs */}
+            <div className="flex border-b border-slate-200 bg-slate-50 px-5 pt-3 space-x-4 text-xs font-bold">
+              <button
+                onClick={() => {
+                  setHolidayError(null);
+                  setHolidaySuccessMsg(null);
+                  setHolidayTab("list");
+                }}
+                className={`pb-2.5 px-1 border-b-2 transition flex items-center space-x-1.5 cursor-pointer ${
+                  holidayTab === "list"
+                    ? "border-purple-600 text-purple-700"
+                    : "border-transparent text-slate-500 hover:text-slate-800"
+                }`}
+              >
+                <span>Holidays List</span>
+                <span className="bg-purple-100 text-purple-800 px-1.5 py-0.2 rounded-full text-[10px]">
+                  {holidaysList.length}
+                </span>
+              </button>
+              <button
+                onClick={() => {
+                  setHolidayError(null);
+                  setHolidaySuccessMsg(null);
+                  setHolidayTab("add");
+                }}
+                className={`pb-2.5 px-1 border-b-2 transition flex items-center space-x-1 cursor-pointer ${
+                  holidayTab === "add"
+                    ? "border-purple-600 text-purple-700"
+                    : "border-transparent text-slate-500 hover:text-slate-800"
+                }`}
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Add Single Holiday</span>
+              </button>
+              <button
+                onClick={() => {
+                  setHolidayError(null);
+                  setHolidaySuccessMsg(null);
+                  setHolidayTab("import");
+                }}
+                className={`pb-2.5 px-1 border-b-2 transition flex items-center space-x-1 cursor-pointer ${
+                  holidayTab === "import"
+                    ? "border-purple-600 text-purple-700"
+                    : "border-transparent text-slate-500 hover:text-slate-800"
+                }`}
+              >
+                <Upload className="w-3.5 h-3.5" />
+                <span>Import from Excel / PDF</span>
+              </button>
+            </div>
+
+            {/* Content Body */}
+            <div className="p-6">
+              {holidayError && (
+                <div className="mb-4 p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-xl flex items-center space-x-2">
+                  <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                  <span>{holidayError}</span>
+                </div>
+              )}
+
+              {holidaySuccessMsg && (
+                <div className="mb-4 p-3 bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs rounded-xl flex items-center space-x-2">
+                  <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
+                  <span>{holidaySuccessMsg}</span>
+                </div>
+              )}
+
+              {holidayTab === "list" && (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between text-xs text-slate-500">
+                    <span>Configured Official Holidays ({holidaysList.length})</span>
+                    <button
+                      onClick={() => setHolidayTab("add")}
+                      className="text-purple-600 font-bold hover:underline cursor-pointer"
+                    >
+                      + Add New
+                    </button>
+                  </div>
+
+                  {holidaysList.length === 0 ? (
+                    <div className="py-8 text-center text-slate-400 text-xs">
+                      <p className="font-semibold text-slate-600">No public holidays added yet.</p>
+                      <p className="mt-1">Add individual holidays or import your annual calendar from Excel/PDF.</p>
+                    </div>
+                  ) : (
+                    <div className="max-h-72 overflow-y-auto divide-y divide-slate-100 border border-slate-200 rounded-xl">
+                      {holidaysList.map((h: any) => {
+                        const d = new Date(h.date);
+                        const dayName = d.toLocaleDateString("en-US", { weekday: "short" });
+                        return (
+                          <div
+                            key={h.id}
+                            className="p-3 flex items-center justify-between hover:bg-slate-50 transition"
+                          >
+                            <div className="flex items-center space-x-3">
+                              <div className="bg-purple-100 text-purple-800 px-2.5 py-1 rounded-lg font-mono font-bold text-xs">
+                                {h.date}
+                              </div>
+                              <div>
+                                <h5 className="font-bold text-xs text-slate-900">{h.name}</h5>
+                                <p className="text-[11px] text-slate-400">
+                                  {dayName} {h.description ? `• ${h.description}` : ""}
+                                </p>
+                              </div>
+                            </div>
+                            <button
+                              onClick={() => handleDeleteHoliday(h.id, h.name)}
+                              className="text-slate-400 hover:text-rose-600 p-1.5 rounded-lg hover:bg-rose-50 transition cursor-pointer"
+                              title="Delete Holiday"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {holidayTab === "add" && (
+                <form onSubmit={handleAddHoliday} className="space-y-4 text-xs">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                      Holiday Date <span className="text-rose-500">*</span>
+                    </label>
+                    <input
+                      type="date"
+                      required
+                      value={holidayDate}
+                      onChange={(e) => setHolidayDate(e.target.value)}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs font-medium text-slate-800 outline-none focus:ring-2 focus:ring-purple-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                      Holiday Name / Occasion <span className="text-rose-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. Republic Day, Independence Day, Diwali, Eid..."
+                      value={holidayName}
+                      onChange={(e) => setHolidayName(e.target.value)}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs font-medium text-slate-800 outline-none focus:ring-2 focus:ring-purple-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                      Description / Regional Applicability (Optional)
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. National Gazetted Holiday across all branches"
+                      value={holidayDesc}
+                      onChange={(e) => setHolidayDesc(e.target.value)}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs font-medium text-slate-800 outline-none focus:ring-2 focus:ring-purple-500"
+                    />
+                  </div>
+
+                  <div className="pt-2 flex items-center justify-end space-x-2">
+                    <button
+                      type="button"
+                      onClick={() => setHolidayTab("list")}
+                      className="px-4 py-2 font-semibold text-slate-600 hover:bg-slate-100 rounded-lg transition"
+                    >
+                      Back
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={holidaySubmitting}
+                      className="px-5 py-2 font-bold bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition shadow-xs disabled:opacity-50 flex items-center space-x-1.5 cursor-pointer"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>{holidaySubmitting ? "Adding..." : "Add to Calendar"}</span>
+                    </button>
+                  </div>
+                </form>
+              )}
+
+              {holidayTab === "import" && (
+                <form onSubmit={handleBulkImportHolidays} className="space-y-4 text-xs">
+                  <div className="bg-purple-50/60 border border-purple-200 p-3.5 rounded-xl space-y-2">
+                    <div className="font-bold text-purple-900 flex items-center justify-between">
+                      <span>Import Format (YYYY-MM-DD | Holiday Name | Description):</span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const sample = `2026-01-26 | Republic Day | National Gazetted Holiday\n2026-03-25 | Holi | Festival of Colors\n2026-08-15 | Independence Day | National Holiday\n2026-10-02 | Mahatma Gandhi Jayanti | Gazetted Holiday\n2026-10-20 | Dussehra (Vijayadashami) | Festival Holiday\n2026-11-08 | Diwali (Deepavali) | Festival of Lights\n2026-12-25 | Christmas Day | Gazetted Holiday`;
+                          setHolidayImportText(sample);
+                        }}
+                        className="text-purple-700 hover:underline text-[11px] font-semibold cursor-pointer"
+                      >
+                        Paste Sample Holidays
+                      </button>
+                    </div>
+                    <div className="font-mono text-[11px] text-slate-600 bg-white p-2 rounded border border-purple-200">
+                      2026-01-26 | Republic Day | National Holiday
+                    </div>
+                    <p className="text-[11px] text-slate-500">
+                      You can paste data copied directly from Excel, CSV, Google Sheets, or PDF calendar lists.
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                      Paste Holiday Calendar Rows <span className="text-purple-600">*</span>
+                    </label>
+                    <textarea
+                      rows={6}
+                      required
+                      placeholder="Paste date and holiday name rows here..."
+                      value={holidayImportText}
+                      onChange={(e) => setHolidayImportText(e.target.value)}
+                      className="w-full px-3 py-2 font-mono text-xs border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-purple-500"
+                    />
+                  </div>
+
+                  <div className="pt-2 flex items-center justify-end space-x-2">
+                    <button
+                      type="button"
+                      onClick={() => setHolidayTab("list")}
+                      className="px-4 py-2 font-semibold text-slate-600 hover:bg-slate-100 rounded-lg transition"
+                    >
+                      Back
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={holidayImportSubmitting || !holidayImportText.trim()}
+                      className="px-5 py-2 font-bold bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition shadow-xs disabled:opacity-50 flex items-center space-x-1.5 cursor-pointer"
+                    >
+                      <Upload className="w-3.5 h-3.5" />
+                      <span>{holidayImportSubmitting ? "Importing Holidays..." : "Import Holidays to Calendar"}</span>
+                    </button>
+                  </div>
+                </form>
+              )}
+            </div>
           </div>
         </div>
       )}

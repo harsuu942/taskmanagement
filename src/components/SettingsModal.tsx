@@ -63,6 +63,8 @@ export default function SettingsModal({
   const [companyDailyHours, setCompanyDailyHours] = useState<number>(8);
   const [enableSundayOt, setEnableSundayOt] = useState<boolean>(true);
   const [standardWorkDays, setStandardWorkDays] = useState<number>(26);
+  const [annualLeaveQuota, setAnnualLeaveQuota] = useState<number>(18);
+  const [earnedLeaveAccrual, setEarnedLeaveAccrual] = useState<number>(1.5);
   const [policyLoading, setPolicyLoading] = useState(false);
   const [policyMessage, setPolicyMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
@@ -92,6 +94,8 @@ export default function SettingsModal({
           if (data.settings.companyDailyHours) setCompanyDailyHours(data.settings.companyDailyHours);
           if (data.settings.enableSundayOt !== undefined) setEnableSundayOt(data.settings.enableSundayOt);
           if (data.settings.standardWorkDays) setStandardWorkDays(data.settings.standardWorkDays);
+          if (data.settings.annualLeaveQuota) setAnnualLeaveQuota(data.settings.annualLeaveQuota);
+          if (data.settings.earnedLeaveAccrual) setEarnedLeaveAccrual(data.settings.earnedLeaveAccrual);
         }
       })
       .catch(console.error);
@@ -269,13 +273,15 @@ export default function SettingsModal({
           companyDailyHours,
           enableSundayOt,
           standardWorkDays,
+          annualLeaveQuota,
+          earnedLeaveAccrual,
         }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to save company policy.");
       setPolicyMessage({
         type: "success",
-        text: "Company work hours and Sunday OT policy successfully updated!",
+        text: "Company work policy, leave quotas, and Sunday OT settings successfully updated!",
       });
     } catch (err: any) {
       setPolicyMessage({
@@ -734,6 +740,53 @@ export default function SettingsModal({
               <p className="text-[10px] text-slate-500 mt-1">
                 Used as the denominator for calculating per-day salary rate and leave loss of pay (LWP).
               </p>
+            </div>
+
+            {/* Annual Leave Quota & Earned Leave Accrual */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-3 border-t border-slate-200">
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                  Annual Paid Leave Quota
+                </label>
+                <div className="flex items-center gap-1.5">
+                  <input
+                    type="number"
+                    step="0.5"
+                    min={1}
+                    max={60}
+                    required
+                    value={annualLeaveQuota}
+                    onChange={(e) => setAnnualLeaveQuota(parseFloat(e.target.value) || 18)}
+                    className="w-24 px-3 py-2 border border-slate-300 rounded-lg text-xs font-bold text-slate-900 focus:ring-2 focus:ring-blue-500 outline-none"
+                  />
+                  <span className="text-xs font-semibold text-slate-600">Days / Year</span>
+                </div>
+                <p className="text-[10px] text-slate-500 mt-1">
+                  Official annual quota allocation (standard: 18 days).
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                  Earned Leave (EL) Accrual Rate
+                </label>
+                <div className="flex items-center gap-1.5">
+                  <input
+                    type="number"
+                    step="0.1"
+                    min={0.1}
+                    max={5}
+                    required
+                    value={earnedLeaveAccrual}
+                    onChange={(e) => setEarnedLeaveAccrual(parseFloat(e.target.value) || 1.5)}
+                    className="w-24 px-3 py-2 border border-slate-300 rounded-lg text-xs font-bold text-slate-900 focus:ring-2 focus:ring-blue-500 outline-none"
+                  />
+                  <span className="text-xs font-semibold text-slate-600">Days / Month</span>
+                </div>
+                <p className="text-[10px] text-slate-500 mt-1">
+                  Standard accrual of 1.5 days/month for Earned Leave.
+                </p>
+              </div>
             </div>
 
             {/* Actions */}

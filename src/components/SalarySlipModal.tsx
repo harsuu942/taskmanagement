@@ -104,11 +104,33 @@ export default function SalarySlipModal({
   const [publicHolidays, setPublicHolidays] = useState(0);
   const [overtimeHours, setOvertimeHours] = useState(0);
 
-  // Manual editable adjustments
+  // Manual editable adjustments & components customization
   const [monthlySalaryInput, setMonthlySalaryInput] = useState<number>(30000);
   const [hourlyRateInput, setHourlyRateInput] = useState<number>(200);
   const [otherDeductions, setOtherDeductions] = useState<number>(0);
   const [bonusAmount, setBonusAmount] = useState<number>(0);
+
+  // Admin configurable earnings & deductions components (null = auto calculated by standard formula)
+  const [basicOverride, setBasicOverride] = useState<number | null>(null);
+  const [hraOverride, setHraOverride] = useState<number | null>(null);
+  const [specialOverride, setSpecialOverride] = useState<number | null>(null);
+  const [otPayOverride, setOtPayOverride] = useState<number | null>(null);
+  const [lwpOverride, setLwpOverride] = useState<number | null>(null);
+  const [pfOverride, setPfOverride] = useState<number | null>(null);
+  const [ptOverride, setPtOverride] = useState<number | null>(null);
+  const [showComponentConfig, setShowComponentConfig] = useState(false);
+
+  const handleResetComponents = () => {
+    setBasicOverride(null);
+    setHraOverride(null);
+    setSpecialOverride(null);
+    setOtPayOverride(null);
+    setLwpOverride(null);
+    setPfOverride(null);
+    setPtOverride(null);
+    setOtherDeductions(0);
+    setBonusAmount(0);
+  };
 
   // Email sending state
   const [isSendingEmail, setIsSendingEmail] = useState(false);
@@ -133,6 +155,7 @@ export default function SalarySlipModal({
     if (employee?.hourlyRate && employee.hourlyRate > 0) {
       setHourlyRateInput(employee.hourlyRate);
     }
+    handleResetComponents();
   }, [employee]);
 
   // Fetch employee attendance & leaves for the month
@@ -227,12 +250,12 @@ export default function SalarySlipModal({
     return Math.max(1, totalDaysInMonth - sundays - publicHolidays);
   }, [selectedYear, selectedMonth, totalDaysInMonth, publicHolidays]);
 
-  // Salary Calculations
+  // Salary Calculations with Component Overrides
   const calculations = useMemo(() => {
     const grossBase = Number(monthlySalaryInput) || 0;
-    const basic = grossBase * 0.5; // 50% Basic
-    const hra = grossBase * 0.3; // 30% HRA
-    const special = grossBase * 0.2; // 20% Special/Conveyance
+    const defaultBasic = Math.round(grossBase * 0.5); // 50% Basic
+    const defaultHra = Math.round(grossBase * 0.3); // 30% HRA
+    const defaultSpecial = Math.round(grossBase * 0.2); // 20% Special/Conveyance
 
     // Hourly Rate for OT: either from input or calculated pro-rata
     const effectiveHourlyRate =
@@ -242,33 +265,62 @@ export default function SalarySlipModal({
         ? grossBase / (workingDays * 8)
         : 150;
 
-    const otPay = overtimeHours * effectiveHourlyRate * 1.5;
+    const defaultOtPay = Math.round(overtimeHours * effectiveHourlyRate * 1.5);
 
-    const totalGrossEarnings = basic + hra + special + otPay + Number(bonusAmount || 0);
+    const basic = basicOverride !== null ? basicOverride : defaultBasic;
+    const hra = hraOverride !== null ? hraOverride : defaultHra;
+    const special = specialOverride !== null ? specialOverride : defaultSpecial;
+    const otPay = otPayOverride !== null ? otPayOverride : defaultOtPay;
+    const bonus = Number(bonusAmount || 0);
+
+    const totalGrossEarnings = basic + hra + special + otPay + bonus;
 
     // Deductions
     const perDaySalary = totalDaysInMonth > 0 ? grossBase / totalDaysInMonth : 0;
-    const lwpDeduction = unpaidLeaves * perDaySalary;
-    const pfDeduction = basic >= 15000 ? basic * 0.12 : 0; // Standard PF
-    const ptDeduction = grossBase >= 15000 ? 200 : 0; // Standard PT
+    const defaultLwp = Math.round(unpaidLeaves * perDaySalary);
+    const defaultPf = basic >= 15000 ? Math.round(basic * 0.12) : 0; // Standard PF
+    const defaultPt = grossBase >= 15000 ? 200 : 0; // Standard PT
 
-    const totalDeductionsCalc = lwpDeduction + pfDeduction + ptDeduction + Number(otherDeductions || 0);
+    const lwpDeduction = lwpOverride !== null ? lwpOverride : defaultLwp;
+    const pfDeduction = pfOverride !== null ? pfOverride : defaultPf;
+    const ptDeduction = ptOverride !== null ? ptOverride : defaultPt;
+    const other = Number(otherDeductions || 0);
+
+    const totalDeductionsCalc = lwpDeduction + pfDeduction + ptDeduction + other;
     const netSalaryCalc = Math.max(0, totalGrossEarnings - totalDeductionsCalc);
 
     return {
       basicSalary: Math.round(basic),
+      defaultBasic,
       hra: Math.round(hra),
+      defaultHra,
       specialAllowance: Math.round(special),
+      defaultSpecial,
       overtimePay: Math.round(otPay),
+      defaultOtPay,
+      bonusAmount: Math.round(bonus),
       grossEarnings: Math.round(totalGrossEarnings),
       unpaidDeduction: Math.round(lwpDeduction),
+      defaultLwp,
       pfDeduction: Math.round(pfDeduction),
+      defaultPf,
       ptDeduction: Math.round(ptDeduction),
-      otherDeductions: Math.round(Number(otherDeductions || 0)),
+      defaultPt,
+      otherDeductions: Math.round(other),
       totalDeductions: Math.round(totalDeductionsCalc),
       netSalary: Math.round(netSalaryCalc),
       netSalaryInWords: numberToWords(Math.round(netSalaryCalc)),
       effectiveHourlyRate: Math.round(effectiveHourlyRate),
+      hasCustomComponents:
+        basicOverride !== null ||
+        hraOverride !== null ||
+        specialOverride !== null ||
+        otPayOverride !== null ||
+        lwpOverride !== null ||
+        pfOverride !== null ||
+        ptOverride !== null ||
+        otherDeductions > 0 ||
+        bonusAmount > 0,
     };
   }, [
     monthlySalaryInput,
@@ -279,6 +331,13 @@ export default function SalarySlipModal({
     totalDaysInMonth,
     unpaidLeaves,
     otherDeductions,
+    basicOverride,
+    hraOverride,
+    specialOverride,
+    otPayOverride,
+    lwpOverride,
+    pfOverride,
+    ptOverride,
   ]);
 
   const monthYearString = `${months[selectedMonth]} ${selectedYear}`;
@@ -491,6 +550,197 @@ export default function SalarySlipModal({
               />
             </div>
           </div>
+
+          {/* Admin Components Customization Button */}
+          <div className="pt-2 border-t border-slate-200 flex items-center justify-between">
+            <button
+              type="button"
+              onClick={() => setShowComponentConfig(!showComponentConfig)}
+              className="text-xs font-bold text-blue-700 hover:text-blue-800 flex items-center space-x-1.5 cursor-pointer"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-blue-600" />
+              <span>
+                {showComponentConfig
+                  ? "Hide Component Customization"
+                  : "⚙️ Set Earning & Deduction Components"}
+              </span>
+              {calculations.hasCustomComponents && (
+                <span className="text-[10px] bg-blue-100 text-blue-800 px-1.5 py-0.2 rounded-full font-extrabold">
+                  Custom Components Active
+                </span>
+              )}
+            </button>
+
+            {calculations.hasCustomComponents && (
+              <button
+                type="button"
+                onClick={handleResetComponents}
+                className="text-[11px] text-slate-500 hover:text-rose-600 underline cursor-pointer"
+              >
+                Reset to Standard Auto Formula
+              </button>
+            )}
+          </div>
+
+          {/* Component Config Panel */}
+          {showComponentConfig && (
+            <div className="bg-white border border-slate-200 rounded-xl p-3.5 mt-2 space-y-3 animate-in fade-in duration-150">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-extrabold text-slate-800 uppercase tracking-wider">
+                  Admin Salary Components Adjustment
+                </span>
+                <span className="text-[10px] text-slate-500">
+                  Override standard percentages or statutory deductions as needed
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Earnings Components */}
+                <div className="bg-emerald-50/50 border border-emerald-200 rounded-lg p-3 space-y-2">
+                  <div className="text-xs font-bold text-emerald-900 border-b border-emerald-200 pb-1 flex items-center justify-between">
+                    <span>Earnings Components</span>
+                    <span className="text-[10px] text-emerald-700 font-bold">Gross: {formatINR(calculations.grossEarnings)}</span>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div>
+                      <label className="block text-[10px] text-slate-600 font-semibold mb-0.5">
+                        Basic Salary (₹)
+                      </label>
+                      <input
+                        type="number"
+                        placeholder={`Auto: ${calculations.defaultBasic}`}
+                        value={basicOverride !== null ? basicOverride : ""}
+                        onChange={(e) =>
+                          setBasicOverride(e.target.value === "" ? null : parseFloat(e.target.value) || 0)
+                        }
+                        className="w-full px-2 py-1 border border-slate-300 rounded text-xs bg-white font-bold"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] text-slate-600 font-semibold mb-0.5">
+                        HRA (₹)
+                      </label>
+                      <input
+                        type="number"
+                        placeholder={`Auto: ${calculations.defaultHra}`}
+                        value={hraOverride !== null ? hraOverride : ""}
+                        onChange={(e) =>
+                          setHraOverride(e.target.value === "" ? null : parseFloat(e.target.value) || 0)
+                        }
+                        className="w-full px-2 py-1 border border-slate-300 rounded text-xs bg-white font-bold"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] text-slate-600 font-semibold mb-0.5">
+                        Special / Conveyance (₹)
+                      </label>
+                      <input
+                        type="number"
+                        placeholder={`Auto: ${calculations.defaultSpecial}`}
+                        value={specialOverride !== null ? specialOverride : ""}
+                        onChange={(e) =>
+                          setSpecialOverride(e.target.value === "" ? null : parseFloat(e.target.value) || 0)
+                        }
+                        className="w-full px-2 py-1 border border-slate-300 rounded text-xs bg-white font-bold"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] text-slate-600 font-semibold mb-0.5">
+                        Overtime Pay (₹)
+                      </label>
+                      <input
+                        type="number"
+                        placeholder={`Auto: ${calculations.defaultOtPay}`}
+                        value={otPayOverride !== null ? otPayOverride : ""}
+                        onChange={(e) =>
+                          setOtPayOverride(e.target.value === "" ? null : parseFloat(e.target.value) || 0)
+                        }
+                        className="w-full px-2 py-1 border border-slate-300 rounded text-xs bg-white font-bold"
+                      />
+                    </div>
+                    <div className="col-span-2">
+                      <label className="block text-[10px] text-slate-600 font-semibold mb-0.5">
+                        Performance / Festival Bonus (₹)
+                      </label>
+                      <input
+                        type="number"
+                        placeholder="0"
+                        value={bonusAmount || ""}
+                        onChange={(e) => setBonusAmount(parseFloat(e.target.value) || 0)}
+                        className="w-full px-2 py-1 border border-slate-300 rounded text-xs bg-white font-bold text-emerald-800"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Deductions Components */}
+                <div className="bg-rose-50/50 border border-rose-200 rounded-lg p-3 space-y-2">
+                  <div className="text-xs font-bold text-rose-900 border-b border-rose-200 pb-1 flex items-center justify-between">
+                    <span>Deduction Components</span>
+                    <span className="text-[10px] text-rose-700 font-bold">Total: {formatINR(calculations.totalDeductions)}</span>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div>
+                      <label className="block text-[10px] text-slate-600 font-semibold mb-0.5">
+                        Loss of Pay (LWP ₹)
+                      </label>
+                      <input
+                        type="number"
+                        placeholder={`Auto: ${calculations.defaultLwp}`}
+                        value={lwpOverride !== null ? lwpOverride : ""}
+                        onChange={(e) =>
+                          setLwpOverride(e.target.value === "" ? null : parseFloat(e.target.value) || 0)
+                        }
+                        className="w-full px-2 py-1 border border-slate-300 rounded text-xs bg-white font-bold text-rose-700"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] text-slate-600 font-semibold mb-0.5">
+                        Provident Fund (PF ₹)
+                      </label>
+                      <input
+                        type="number"
+                        placeholder={`Auto: ${calculations.defaultPf}`}
+                        value={pfOverride !== null ? pfOverride : ""}
+                        onChange={(e) =>
+                          setPfOverride(e.target.value === "" ? null : parseFloat(e.target.value) || 0)
+                        }
+                        className="w-full px-2 py-1 border border-slate-300 rounded text-xs bg-white font-bold text-rose-700"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] text-slate-600 font-semibold mb-0.5">
+                        Professional Tax / TDS (₹)
+                      </label>
+                      <input
+                        type="number"
+                        placeholder={`Auto: ${calculations.defaultPt}`}
+                        value={ptOverride !== null ? ptOverride : ""}
+                        onChange={(e) =>
+                          setPtOverride(e.target.value === "" ? null : parseFloat(e.target.value) || 0)
+                        }
+                        className="w-full px-2 py-1 border border-slate-300 rounded text-xs bg-white font-bold text-rose-700"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] text-slate-600 font-semibold mb-0.5">
+                        Other Deductions (₹)
+                      </label>
+                      <input
+                        type="number"
+                        placeholder="0"
+                        value={otherDeductions || ""}
+                        onChange={(e) => setOtherDeductions(parseFloat(e.target.value) || 0)}
+                        className="w-full px-2 py-1 border border-slate-300 rounded text-xs bg-white font-bold text-rose-700"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Printable Salary Slip Content */}
@@ -767,23 +1017,19 @@ export default function SalarySlipModal({
             </div>
           </div>
 
-          {/* Section 5: Signature / Signatory */}
-          <div className="pt-10 flex items-center justify-between text-xs text-slate-600">
-            <div className="text-center w-48 border-t border-slate-400 pt-2 font-semibold">
-              <p className="text-slate-900 font-bold">Authorized Signatory</p>
-              <p className="text-[11px] text-slate-500">NACS Consulting HR / Accounts</p>
+          {/* Section 5: Auto Generated Document Notice (Replaces Signatures) */}
+          <div className="pt-8 border-t border-slate-300 flex flex-col items-center justify-center text-center space-y-2">
+            <div className="inline-flex items-center space-x-2 bg-slate-100 text-slate-800 border border-slate-300 px-4 py-1.5 rounded-full text-xs font-bold shadow-2xs">
+              <Sparkles className="w-3.5 h-3.5 text-blue-600" />
+              <span>This auto generator &bull; System Verified Document</span>
             </div>
-
-            <div className="text-center w-48 border-t border-slate-400 pt-2 font-semibold">
-              <p className="text-slate-900 font-bold">{employee?.name || "Employee"}</p>
-              <p className="text-[11px] text-slate-500">Employee Signature</p>
-            </div>
+            <p className="text-xs font-bold text-slate-900">
+              This is an auto-generated salary slip and does not require a signature.
+            </p>
+            <p className="text-[11px] text-slate-500">
+              Generated automatically by NACS Task &amp; Payroll Management System &bull; Legally valid digital voucher
+            </p>
           </div>
-
-          {/* Note */}
-          <p className="text-[10px] text-slate-400 text-center italic pt-4">
-            This salary voucher is computer-generated and legally valid. For queries, contact accounts@nacsconsulting.com.
-          </p>
         </div>
       </div>
     </div>

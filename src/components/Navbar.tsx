@@ -241,101 +241,121 @@ export default function Navbar({
               </div>
             )}
 
-            {/* Attendance Punch In/Out/Break Widget (Break Button on TOP) */}
-            <div className="flex items-center bg-slate-100 rounded-lg p-1 border border-slate-200">
-              {isOnBreak ? (
-                <div className="flex items-center space-x-1.5 px-2 py-0.5">
-                  <span className="relative flex h-2 w-2">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
-                  </span>
-                  <div className="flex flex-col text-left">
-                    <span className="text-[9px] uppercase font-bold text-amber-700 leading-tight">On Break</span>
-                    <span className="text-xs font-mono font-bold text-amber-900 leading-tight">
-                      {formatHoursMins(elapsedBreakSeconds)}
+            {/* Attendance Punch In/Out/Break Widget (Check in, Break, Check out with Enabled/Disabled States) */}
+            <div className="flex items-center bg-slate-100 rounded-lg p-1 border border-slate-200 space-x-1.5">
+              {/* Status & Timer Indicator */}
+              <div className="flex items-center space-x-1.5 px-2 py-0.5">
+                {isOnBreak ? (
+                  <>
+                    <span className="relative flex h-2 w-2">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
                     </span>
-                  </div>
-                  {onResumeBreak && (
-                    <button
-                      onClick={onResumeBreak}
-                      className="ml-1 bg-amber-600 hover:bg-amber-700 text-white px-2.5 py-1 rounded text-xs font-bold transition shadow-xs flex items-center space-x-1"
-                      title="Resume work from break"
-                    >
-                      <Play className="w-3 h-3 fill-current" />
-                      <span>Resume Work</span>
-                    </button>
-                  )}
-                  <button
-                    onClick={onCheckOut}
-                    className="ml-0.5 bg-rose-600 hover:bg-rose-700 text-white px-2 py-1 rounded text-xs font-bold transition shadow-xs flex items-center space-x-1"
-                    title="Check out for the day"
-                  >
-                    <LogOut className="w-3 h-3" />
-                    <span className="hidden sm:inline">Check Out</span>
-                  </button>
-                </div>
-              ) : isCheckedIn ? (
-                <div className="flex items-center space-x-1.5 px-2 py-0.5">
-                  <span className="relative flex h-2 w-2">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-                  </span>
-                  <div className="flex flex-col text-left">
-                    <span className="text-[9px] uppercase font-bold text-emerald-700 leading-tight">Active Shift</span>
-                    <span className="text-xs font-mono font-bold text-slate-800 leading-tight">
-                      {formatHoursMins(elapsedWorkSeconds)}
+                    <div className="flex flex-col text-left">
+                      <span className="text-[9px] uppercase font-bold text-amber-700 leading-tight">On Break</span>
+                      <span className="text-xs font-mono font-bold text-amber-900 leading-tight">
+                        {formatHoursMins(elapsedBreakSeconds)}
+                      </span>
+                    </div>
+                  </>
+                ) : isCheckedIn ? (
+                  <>
+                    <span className="relative flex h-2 w-2">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
                     </span>
-                  </div>
-                  {onTakeBreak && (
-                    <button
-                      onClick={onTakeBreak}
-                      className="ml-1 bg-amber-500 hover:bg-amber-600 text-white px-2 py-1 rounded text-xs font-bold transition shadow-xs flex items-center space-x-1"
-                      title="Take a break (Pauses work shift)"
-                    >
-                      <Coffee className="w-3 h-3" />
-                      <span className="font-bold">Break</span>
-                    </button>
-                  )}
-                  <button
-                    onClick={onCheckOut}
-                    className="ml-0.5 bg-rose-600 hover:bg-rose-700 text-white px-2 py-1 rounded text-xs font-bold transition shadow-xs flex items-center space-x-1"
-                    title="Check out for the day"
-                  >
-                    <LogOut className="w-3 h-3" />
-                    <span className="hidden sm:inline">Check Out</span>
-                  </button>
-                </div>
-              ) : isCheckedOut ? (
-                <div className="flex items-center space-x-2 px-2 py-0.5">
+                    <div className="flex flex-col text-left">
+                      <span className="text-[9px] uppercase font-bold text-emerald-700 leading-tight">Active Shift</span>
+                      <span className="text-xs font-mono font-bold text-slate-800 leading-tight">
+                        {formatHoursMins(elapsedWorkSeconds)}
+                      </span>
+                    </div>
+                  </>
+                ) : isCheckedOut ? (
                   <div className="flex flex-col text-left">
                     <span className="text-[9px] uppercase font-bold text-slate-500 leading-tight">Checked Out</span>
                     <span className="text-xs font-mono font-bold text-slate-700 leading-tight">
                       {formatHoursMins(elapsedWorkSeconds)}
                     </span>
                   </div>
-                  <button
-                    onClick={onCheckIn}
-                    className="ml-1 bg-emerald-600 hover:bg-emerald-700 text-white px-2.5 py-1 rounded text-xs font-bold transition shadow-xs flex items-center space-x-1"
-                    title="Checked out by mistake? Click to re-check in and resume workday"
-                  >
-                    <LogIn className="w-3 h-3" />
-                    <span>Check In / Resume</span>
-                  </button>
-                </div>
-              ) : (
-                <div className="flex items-center space-x-1.5 px-1 py-0.5">
-                  <span className="text-[11px] text-rose-700 font-bold px-2 py-0.5 bg-rose-50 rounded border border-rose-200 hidden sm:inline">
-                    Not Checked In
-                  </span>
-                  <button
-                    onClick={onCheckIn}
-                    className="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1 rounded text-xs font-bold transition shadow-xs flex items-center space-x-1"
-                  >
-                    <LogIn className="w-3.5 h-3.5" />
-                    <span>Check In</span>
-                  </button>
-                </div>
-              )}
+                ) : (
+                  <div className="flex items-center space-x-1 text-slate-500">
+                    <span className="w-2 h-2 rounded-full bg-rose-400"></span>
+                    <span className="text-[10px] uppercase font-bold text-rose-700 hidden sm:inline">
+                      Not In
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              {/* Button 1: Check In */}
+              <button
+                onClick={onCheckIn}
+                disabled={isCheckedIn || isOnBreak}
+                className={`px-2.5 py-1 rounded text-xs font-bold transition shadow-xs flex items-center space-x-1 ${
+                  isCheckedIn || isOnBreak
+                    ? "bg-slate-200 text-slate-400 cursor-not-allowed border border-slate-300 opacity-60"
+                    : "bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer active:scale-95"
+                }`}
+                title={
+                  isCheckedIn
+                    ? "Already checked in"
+                    : isOnBreak
+                    ? "Currently on break"
+                    : isCheckedOut
+                    ? "Click to re-check in & resume shift"
+                    : "Punch in for today's work"
+                }
+              >
+                <LogIn className="w-3 h-3" />
+                <span>{isCheckedIn ? "Checked In" : "Check In"}</span>
+              </button>
+
+              {/* Button 2: Break / Resume */}
+              <button
+                onClick={isOnBreak ? onResumeBreak : onTakeBreak}
+                disabled={(!isCheckedIn && !isOnBreak) || isCheckedOut}
+                className={`px-2.5 py-1 rounded text-xs font-bold transition shadow-xs flex items-center space-x-1 ${
+                  (!isCheckedIn && !isOnBreak) || isCheckedOut
+                    ? "bg-slate-200 text-slate-400 cursor-not-allowed border border-slate-300 opacity-60"
+                    : isOnBreak
+                    ? "bg-amber-600 hover:bg-amber-700 text-white cursor-pointer animate-pulse active:scale-95"
+                    : "bg-amber-500 hover:bg-amber-600 text-white cursor-pointer active:scale-95"
+                }`}
+                title={
+                  isOnBreak
+                    ? "Click to resume work from break"
+                    : isCheckedIn
+                    ? "Click to take a break (pauses shift)"
+                    : "Must check in before taking a break"
+                }
+              >
+                {isOnBreak ? (
+                  <Play className="w-3 h-3 fill-current" />
+                ) : (
+                  <Coffee className="w-3 h-3" />
+                )}
+                <span>{isOnBreak ? "Resume" : "Break"}</span>
+              </button>
+
+              {/* Button 3: Check Out */}
+              <button
+                onClick={onCheckOut}
+                disabled={!isCheckedIn && !isOnBreak}
+                className={`px-2.5 py-1 rounded text-xs font-bold transition shadow-xs flex items-center space-x-1 ${
+                  !isCheckedIn && !isOnBreak
+                    ? "bg-slate-200 text-slate-400 cursor-not-allowed border border-slate-300 opacity-60"
+                    : "bg-rose-600 hover:bg-rose-700 text-white cursor-pointer active:scale-95"
+                }`}
+                title={
+                  !isCheckedIn && !isOnBreak
+                    ? "Not checked in"
+                    : "Punch out and end work shift"
+                }
+              >
+                <LogOut className="w-3 h-3" />
+                <span>Check Out</span>
+              </button>
             </div>
 
             {/* Quick Create Task Button */}

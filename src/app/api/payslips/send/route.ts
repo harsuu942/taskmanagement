@@ -199,7 +199,8 @@ function generatePayslipEmailHtml(data: any, employeeName: string, monthYear: st
         </div>
 
         <div class="footer">
-          <p style="margin: 0 0 6px 0;">This is a computer-generated salary slip and does not require a physical signature.</p>
+          <p style="margin: 0 0 6px 0; font-weight: 700; color: #1e293b;">⚡ This auto generator &bull; System Verified</p>
+          <p style="margin: 0 0 4px 0;">This is an auto-generated salary slip and does not require a signature.</p>
           <p style="margin: 0;">NACS Consulting &bull; For any discrepancies, please reach out to accounts / HR.</p>
         </div>
       </div>
