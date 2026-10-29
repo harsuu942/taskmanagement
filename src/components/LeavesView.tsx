@@ -620,7 +620,7 @@ export default function LeavesView({
 
           <div className="flex items-center space-x-2 text-[11px] font-semibold text-slate-500">
             <span className="inline-block w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
-            <span>Annual Allocation: 30 Days (Casual 12, Sick 8, Earned 10)</span>
+            <span>Total Annual: 18 Days (Accruing 1.5 Days / Month as Earned Leave)</span>
           </div>
         </div>
 
@@ -655,7 +655,11 @@ export default function LeavesView({
                   <div className="flex items-center justify-between text-slate-500">
                     <span>Available:</span>
                     <span className="font-bold text-slate-800">
-                      {item.totalAvailable > 0 ? `${item.totalAvailable}d` : "&mdash;"}
+                      {item.leaveType === "EARNED"
+                        ? "18d (1.5d/mo)"
+                        : item.totalAvailable > 0
+                        ? `${item.totalAvailable}d`
+                        : "&mdash;"}
                     </span>
                   </div>
                   <div className="flex items-center justify-between text-slate-500">

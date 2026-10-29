@@ -111,7 +111,7 @@ export async function GET(request: Request) {
       })),
     };
 
-    // Calculate Leave Available - Leave Taken - Balance summary
+    // Calculate Leave Available - Leave Taken - Balance summary (18 days annual quota, 1.5 days/month Earned Leave)
     const approvedUserLeaves = allLeavesForStats.filter((l) => l.status === "APPROVED");
     const casualTaken = approvedUserLeaves
       .filter((l) => l.leaveType === "CASUAL" || l.leaveType === "HALF_DAY" || l.leaveType === "HOURLY")
@@ -126,27 +126,31 @@ export async function GET(request: Request) {
       .filter((l) => l.leaveType === "UNPAID")
       .reduce((acc, l) => acc + (l.daysCount || 1), 0);
 
+    const totalPaidTaken = parseFloat((casualTaken + sickTaken + earnedTaken).toFixed(2));
+    const totalAnnualQuota = 18;
+    const totalBalance = parseFloat(Math.max(0, totalAnnualQuota - totalPaidTaken).toFixed(2));
+
     const leaveSummary = [
+      {
+        leaveType: "EARNED",
+        label: "Earned Leave (EL)",
+        totalAvailable: 18, // 1.5 days per month * 12 months = 18 days
+        taken: parseFloat(earnedTaken.toFixed(2)),
+        balance: parseFloat(Math.max(0, 18 - earnedTaken).toFixed(2)),
+      },
       {
         leaveType: "CASUAL",
         label: "Casual Leave",
-        totalAvailable: 12,
+        totalAvailable: 0,
         taken: parseFloat(casualTaken.toFixed(2)),
-        balance: parseFloat(Math.max(0, 12 - casualTaken).toFixed(2)),
+        balance: totalBalance,
       },
       {
         leaveType: "SICK",
         label: "Sick Leave",
-        totalAvailable: 8,
+        totalAvailable: 0,
         taken: parseFloat(sickTaken.toFixed(2)),
-        balance: parseFloat(Math.max(0, 8 - sickTaken).toFixed(2)),
-      },
-      {
-        leaveType: "EARNED",
-        label: "Earned Leave",
-        totalAvailable: 10,
-        taken: parseFloat(earnedTaken.toFixed(2)),
-        balance: parseFloat(Math.max(0, 10 - earnedTaken).toFixed(2)),
+        balance: totalBalance,
       },
       {
         leaveType: "UNPAID",
@@ -157,10 +161,10 @@ export async function GET(request: Request) {
       },
       {
         leaveType: "TOTAL",
-        label: "Total Annual Balance",
-        totalAvailable: 30,
-        taken: parseFloat((casualTaken + sickTaken + earnedTaken).toFixed(2)),
-        balance: parseFloat(Math.max(0, 30 - (casualTaken + sickTaken + earnedTaken)).toFixed(2)),
+        label: "Total Annual Quota",
+        totalAvailable: 18,
+        taken: totalPaidTaken,
+        balance: totalBalance,
       },
     ];
 
