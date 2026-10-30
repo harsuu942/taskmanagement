@@ -780,7 +780,7 @@ export default function SalarySlipModal({
               <span>
                 {showComponentConfig
                   ? "Hide Component Customization"
-                  : "⚙️ Set Earning & Deduction Components"}
+                  : "Set Earning & Deduction Components"}
               </span>
               {calculations.hasCustomComponents && (
                 <span className="text-[10px] bg-blue-100 text-blue-800 px-1.5 py-0.2 rounded-full font-extrabold">

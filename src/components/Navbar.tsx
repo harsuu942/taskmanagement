@@ -122,67 +122,51 @@ export default function Navbar({
     return `${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
   };
 
-  // Distinct Color Coded Top Navigation Tabs with Role-Based Visibility
+  // Unified Cohesive Top Navigation Tabs Theme
   const allNavItems = [
     {
       id: "list",
       label: "Active Tasks",
       icon: ListTodo,
-      activeColor: "bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md shadow-blue-500/20 border-blue-600",
-      inactiveColor: "text-slate-600 hover:text-blue-700 hover:bg-blue-50/80",
     },
     {
       id: "completed",
       label: "Completed Tasks",
       icon: CheckCheck,
       badge: completedTasksCount,
-      activeColor: "bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-md shadow-emerald-500/20 border-emerald-600",
-      inactiveColor: "text-slate-600 hover:text-emerald-700 hover:bg-emerald-50/80",
     },
     {
       id: "clients",
       label: "Clients",
       adminOnly: true, // Only visible to Admin
       icon: Building2,
-      activeColor: "bg-gradient-to-r from-cyan-600 to-blue-600 text-white shadow-md shadow-cyan-500/20 border-cyan-600",
-      inactiveColor: "text-slate-600 hover:text-cyan-700 hover:bg-cyan-50/80",
     },
     {
       id: "recurring",
       label: isAdmin ? "Recurring Tasks" : "My Recurring Tasks",
       icon: Calendar,
-      activeColor: "bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md shadow-indigo-500/20 border-indigo-600",
-      inactiveColor: "text-slate-600 hover:text-indigo-700 hover:bg-indigo-50/80",
     },
     {
       id: "attendance",
       label: isAdmin ? "Attendance Register" : "My Attendance",
       icon: Clock,
-      activeColor: "bg-gradient-to-r from-teal-600 to-cyan-600 text-white shadow-md shadow-teal-500/20 border-teal-600",
-      inactiveColor: "text-slate-600 hover:text-teal-700 hover:bg-teal-50/80",
     },
     {
       id: "reports",
       label: "Reports",
       adminOnly: true, // Only visible to Admin
       icon: FileSpreadsheet,
-      activeColor: "bg-gradient-to-r from-amber-500 to-orange-600 text-white shadow-md shadow-amber-500/20 border-amber-500",
-      inactiveColor: "text-slate-600 hover:text-amber-700 hover:bg-amber-50/80",
     },
     {
       id: "employees",
       label: "Employee's list",
       adminOnly: true, // Only visible to Admin
       icon: Users,
-      activeColor: "bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-md shadow-purple-500/20 border-purple-600",
-      inactiveColor: "text-slate-600 hover:text-purple-700 hover:bg-purple-50/80",
     },
     {
       id: "leaves",
       label: "Leave Management",
       icon: CalendarDays,
-      activeColor: "bg-gradient-to-r from-rose-600 to-amber-600 text-white shadow-md shadow-rose-500/20 border-rose-600",
-      inactiveColor: "text-slate-600 hover:text-rose-700 hover:bg-rose-50/80",
     },
   ];
 
@@ -498,27 +482,27 @@ export default function Navbar({
               <button
                 key={item.id}
                 onClick={() => setActiveTab(item.id)}
-                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center space-x-2.5 border ${
+                className={`px-3.5 py-2 rounded-xl text-xs font-semibold transition-all flex items-center space-x-2 border cursor-pointer ${
                   isActive
-                    ? item.activeColor
-                    : `${item.inactiveColor} bg-white border-slate-200 shadow-2xs`
+                    ? "bg-blue-600 text-white border-blue-600 shadow-sm shadow-blue-500/20 font-bold"
+                    : "bg-white text-slate-600 hover:text-slate-900 hover:bg-slate-100 border-slate-200 shadow-2xs"
                 }`}
               >
-                <Icon className={`w-4 h-4 ${isActive ? "text-white" : ""}`} />
+                <Icon className={`w-4 h-4 ${isActive ? "text-white" : "text-slate-500"}`} />
                 <span>{item.label}</span>
                 {item.badge !== undefined && (
                   <span
-                    className={`text-[10px] px-1.5 py-0.2 rounded-full font-extrabold ${
+                    className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
                       isActive
-                        ? "bg-white text-emerald-800"
-                        : "bg-emerald-100 text-emerald-800"
+                        ? "bg-white/20 text-white"
+                        : "bg-blue-50 text-blue-700 border border-blue-200"
                     }`}
                   >
                     {item.badge}
                   </span>
                 )}
                 {isActive && (
-                  <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
+                  <span className="w-1.5 h-1.5 rounded-full bg-white/90" />
                 )}
               </button>
             );

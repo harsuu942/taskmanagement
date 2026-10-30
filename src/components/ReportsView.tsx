@@ -594,13 +594,14 @@ export default function ReportsView({ currentUser, allUsers }: ReportsViewProps)
                   setDatePreset("today");
                   setDate(todayStr);
                 }}
-                className={`px-3 py-1 text-xs font-bold rounded-lg transition ${
+                className={`px-3 py-1 text-xs font-bold rounded-lg transition flex items-center space-x-1.5 ${
                   dateMode === "single"
                     ? "bg-white text-blue-700 shadow-xs"
                     : "text-slate-600 hover:text-slate-900"
                 }`}
               >
-                📅 Single Day Report
+                <Calendar className="w-3.5 h-3.5" />
+                <span>Single Day Report</span>
               </button>
               <button
                 type="button"
@@ -609,13 +610,14 @@ export default function ReportsView({ currentUser, allUsers }: ReportsViewProps)
                   setDatePreset("thisMonth");
                   applyRangePreset("thisMonth");
                 }}
-                className={`px-3 py-1 text-xs font-bold rounded-lg transition ${
+                className={`px-3 py-1 text-xs font-bold rounded-lg transition flex items-center space-x-1.5 ${
                   dateMode === "range"
                     ? "bg-white text-blue-700 shadow-xs"
                     : "text-slate-600 hover:text-slate-900"
                 }`}
               >
-                🗓️ Custom Date Range (Multi-Day Extract)
+                <Calendar className="w-3.5 h-3.5" />
+                <span>Custom Date Range (Multi-Day Extract)</span>
               </button>
             </div>
 

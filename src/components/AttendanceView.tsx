@@ -535,60 +535,64 @@ export default function AttendanceView({ currentUser, onRefresh }: AttendanceVie
 
 
       {/* Interactive Personal Check-In / Check-Out Panel */}
-      <div className="bg-gradient-to-r from-slate-900 to-indigo-950 rounded-2xl p-6 text-white shadow-xl flex flex-col md:flex-row items-center justify-between gap-6">
+      <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-xs flex flex-col md:flex-row items-center justify-between gap-6">
         <div>
-          <div className="flex items-center space-x-2">
-            <Clock className="w-5 h-5 text-blue-400" />
-            <h3 className="text-sm font-bold uppercase tracking-wider text-slate-300">
-              Personal Attendance Punch Card
-            </h3>
-          </div>
-          <div className="text-xl font-bold text-white mt-1 flex items-center space-x-2">
-            <span>{currentUser?.name}</span>
-            <span className="text-xs text-slate-400 font-normal">({currentUser?.email})</span>
+          <div className="flex items-center space-x-3">
+            <div className="p-2.5 bg-blue-50 text-blue-600 rounded-xl border border-blue-100">
+              <Clock className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                Personal Attendance Punch Card
+              </div>
+              <div className="text-lg font-bold text-slate-900 flex items-center space-x-2">
+                <span>{currentUser?.name}</span>
+                <span className="text-xs text-slate-500 font-normal">({currentUser?.email})</span>
+              </div>
+            </div>
           </div>
 
-          <div className="mt-3 flex items-center space-x-4 text-xs text-slate-300">
-            <div>
-              Status:{" "}
+          <div className="mt-3 flex items-center space-x-4 text-xs text-slate-600 flex-wrap gap-y-1">
+            <div className="flex items-center space-x-1.5">
+              <span className="text-slate-500">Status:</span>
               {isOnBreak ? (
-                <span className="text-amber-400 font-bold bg-amber-950/60 px-2 py-0.5 rounded border border-amber-500/40">
-                  ☕ On Break
+                <span className="text-amber-700 font-bold bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
+                  On Break
                 </span>
               ) : isCheckedIn ? (
-                <span className="text-emerald-400 font-bold bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-500/40">
+                <span className="text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
                   ● Checked In (Working)
                 </span>
               ) : isCheckedOut ? (
-                <span className="text-blue-400 font-bold bg-blue-950/60 px-2 py-0.5 rounded border border-blue-500/40">
+                <span className="text-blue-700 font-bold bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
                   ✓ Checked Out
                 </span>
               ) : myRecord?.status === "PUBLIC_HOLIDAY" ? (
-                <span className="text-amber-300 font-bold bg-amber-950/60 px-2 py-0.5 rounded border border-amber-500/40">
-                  🎉 Public Holiday{myRecord.holidayName ? `: ${myRecord.holidayName}` : ""}
+                <span className="text-amber-700 font-bold bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
+                  Public Holiday{myRecord.holidayName ? `: ${myRecord.holidayName}` : ""}
                 </span>
               ) : myRecord?.status === "ON_LEAVE" ? (
-                <span className="text-purple-300 font-bold bg-purple-950/60 px-2 py-0.5 rounded border border-purple-500/40">
-                  🌴 Approved Leave
+                <span className="text-purple-700 font-bold bg-purple-50 px-2 py-0.5 rounded border border-purple-200">
+                  Approved Leave
                 </span>
               ) : (
-                <span className="text-rose-400 font-bold bg-rose-950/60 px-2 py-0.5 rounded border border-rose-500/40">
+                <span className="text-rose-700 font-bold bg-rose-50 px-2 py-0.5 rounded border border-rose-200">
                   ● Not Checked In
                 </span>
               )}
             </div>
             {myRecord?.checkInTime && (
               <div>
-                Check-In:{" "}
-                <strong className="text-white">
+                <span className="text-slate-500">Check-In: </span>
+                <strong className="text-slate-900 font-semibold">
                   {new Date(myRecord.checkInTime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                 </strong>
               </div>
             )}
             {myRecord?.breakDurationSeconds ? (
               <div>
-                Total Break:{" "}
-                <strong className="text-amber-300">
+                <span className="text-slate-500">Total Break: </span>
+                <strong className="text-amber-700 font-semibold">
                   {formatDuration(myRecord.breakDurationSeconds)}
                 </strong>
               </div>
@@ -604,8 +608,8 @@ export default function AttendanceView({ currentUser, onRefresh }: AttendanceVie
             onClick={() => handleAction("check-in")}
             className={`w-full sm:w-auto font-bold px-4 py-2.5 rounded-xl text-xs sm:text-sm transition flex items-center justify-center space-x-1.5 ${
               isCheckedIn || isOnBreak
-                ? "bg-slate-700/40 text-slate-400 cursor-not-allowed border border-slate-600/40 opacity-50"
-                : "bg-emerald-500 hover:bg-emerald-600 text-white shadow-lg shadow-emerald-500/20 cursor-pointer active:scale-95"
+                ? "bg-slate-100 text-slate-400 cursor-not-allowed border border-slate-200"
+                : "bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs cursor-pointer active:scale-95"
             }`}
             title={
               isCheckedIn
@@ -627,10 +631,10 @@ export default function AttendanceView({ currentUser, onRefresh }: AttendanceVie
             onClick={() => (isOnBreak ? handleAction("resume-break") : handleAction("break"))}
             className={`w-full sm:w-auto font-bold px-4 py-2.5 rounded-xl text-xs sm:text-sm transition flex items-center justify-center space-x-1.5 ${
               (!isCheckedIn && !isOnBreak) || isCheckedOut
-                ? "bg-slate-700/40 text-slate-400 cursor-not-allowed border border-slate-600/40 opacity-50"
+                ? "bg-slate-100 text-slate-400 cursor-not-allowed border border-slate-200"
                 : isOnBreak
-                ? "bg-amber-600 hover:bg-amber-700 text-white cursor-pointer shadow-lg animate-pulse active:scale-95"
-                : "bg-amber-500 hover:bg-amber-600 text-white cursor-pointer shadow-lg shadow-amber-500/20 active:scale-95"
+                ? "bg-amber-600 hover:bg-amber-700 text-white cursor-pointer shadow-xs animate-pulse active:scale-95"
+                : "bg-amber-500 hover:bg-amber-600 text-white cursor-pointer shadow-xs active:scale-95"
             }`}
             title={
               isOnBreak
@@ -654,8 +658,8 @@ export default function AttendanceView({ currentUser, onRefresh }: AttendanceVie
             onClick={() => handleAction("check-out")}
             className={`w-full sm:w-auto font-bold px-4 py-2.5 rounded-xl text-xs sm:text-sm transition flex items-center justify-center space-x-1.5 ${
               !isCheckedIn && !isOnBreak
-                ? "bg-slate-700/40 text-slate-400 cursor-not-allowed border border-slate-600/40 opacity-50"
-                : "bg-rose-500 hover:bg-rose-600 text-white cursor-pointer shadow-lg shadow-rose-500/20 active:scale-95"
+                ? "bg-slate-100 text-slate-400 cursor-not-allowed border border-slate-200"
+                : "bg-rose-600 hover:bg-rose-700 text-white cursor-pointer shadow-xs active:scale-95"
             }`}
             title={
               !isCheckedIn && !isOnBreak
@@ -691,7 +695,7 @@ export default function AttendanceView({ currentUser, onRefresh }: AttendanceVie
                     setIsHolidayModalOpen(true);
                     fetchHolidays();
                   }}
-                  className="flex items-center space-x-1.5 px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-xs font-bold transition shadow-xs cursor-pointer"
+                  className="flex items-center space-x-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold transition shadow-xs cursor-pointer"
                   title="Manage Public Holidays & Calendar (Excel/Manual)"
                 >
                   <Calendar className="w-3.5 h-3.5" />
@@ -919,11 +923,11 @@ export default function AttendanceView({ currentUser, onRefresh }: AttendanceVie
                         </span>
                       ) : item.status === "PUBLIC_HOLIDAY" ? (
                         <span className="bg-amber-50 text-amber-900 font-bold px-2.5 py-1 rounded-full text-[10px] border border-amber-300">
-                          🎉 Public Holiday{item.holidayName ? `: ${item.holidayName}` : ""}
+                          Public Holiday{item.holidayName ? `: ${item.holidayName}` : ""}
                         </span>
                       ) : item.status === "ON_LEAVE" ? (
-                        <span className="bg-purple-100 text-purple-800 font-bold px-2.5 py-1 rounded-full text-[10px] border border-purple-200">
-                          🌴 Approved Leave
+                        <span className="bg-blue-50 text-blue-800 font-bold px-2.5 py-1 rounded-full text-[10px] border border-blue-200">
+                          Approved Leave
                         </span>
                       ) : (
                         <span className="bg-rose-100 text-rose-800 font-bold px-2.5 py-1 rounded-full text-[10px] border border-rose-200">
@@ -957,19 +961,21 @@ export default function AttendanceView({ currentUser, onRefresh }: AttendanceVie
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4 overflow-y-auto">
           <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
             {/* Header */}
-            <div className="bg-gradient-to-r from-blue-700 to-indigo-800 text-white p-5 flex items-center justify-between">
-              <div className="flex items-center space-x-2.5">
-                <Clock className="w-5 h-5 text-blue-200" />
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-slate-50 shrink-0">
+              <div className="flex items-center space-x-3">
+                <div className="p-2 bg-blue-50 text-blue-600 rounded-lg border border-blue-100">
+                  <Clock className="w-5 h-5" />
+                </div>
                 <div>
-                  <h3 className="font-extrabold text-base">Edit Staff Attendance</h3>
-                  <p className="text-xs text-blue-100">
+                  <h3 className="font-bold text-base text-slate-900">Edit Staff Attendance</h3>
+                  <p className="text-xs text-slate-500">
                     {editingItem.employee.name} • {editingItem.date || startDate}
                   </p>
                 </div>
               </div>
               <button
                 onClick={() => setEditingItem(null)}
-                className="p-1 text-white/80 hover:text-white hover:bg-white/20 rounded-lg transition cursor-pointer"
+                className="p-1 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-slate-100 transition cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -1102,19 +1108,21 @@ export default function AttendanceView({ currentUser, onRefresh }: AttendanceVie
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4 overflow-y-auto">
           <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full border border-slate-200 overflow-hidden my-8 animate-in fade-in zoom-in-95 duration-200">
             {/* Header */}
-            <div className="bg-gradient-to-r from-purple-700 to-indigo-800 text-white p-5 flex items-center justify-between">
-              <div className="flex items-center space-x-2.5">
-                <Calendar className="w-5 h-5 text-purple-200" />
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-slate-50 shrink-0">
+              <div className="flex items-center space-x-3">
+                <div className="p-2 bg-blue-50 text-blue-600 rounded-lg border border-blue-100">
+                  <Calendar className="w-5 h-5" />
+                </div>
                 <div>
-                  <h3 className="font-extrabold text-base">🎉 Public Holiday Calendar</h3>
-                  <p className="text-xs text-purple-100">
+                  <h3 className="font-bold text-base text-slate-900">Public Holiday Calendar</h3>
+                  <p className="text-xs text-slate-500">
                     Official holidays show as &ldquo;Public Holiday&rdquo; instead of unexcused absent.
                   </p>
                 </div>
               </div>
               <button
                 onClick={() => setIsHolidayModalOpen(false)}
-                className="text-white/80 hover:text-white p-1 rounded-lg hover:bg-white/10 transition cursor-pointer"
+                className="text-slate-400 hover:text-slate-700 p-1 rounded-lg hover:bg-slate-100 transition cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -1126,12 +1134,12 @@ export default function AttendanceView({ currentUser, onRefresh }: AttendanceVie
                 onClick={() => setHolidayTab("list")}
                 className={`pb-2.5 px-1 border-b-2 transition flex items-center space-x-1.5 cursor-pointer ${
                   holidayTab === "list"
-                    ? "border-purple-600 text-purple-700"
+                    ? "border-blue-600 text-blue-600"
                     : "border-transparent text-slate-500 hover:text-slate-800"
                 }`}
               >
                 <span>Holidays List</span>
-                <span className="bg-purple-100 text-purple-800 px-1.5 py-0.2 rounded-full text-[10px]">
+                <span className="bg-blue-100 text-blue-800 px-1.5 py-0.2 rounded-full text-[10px]">
                   {holidaysList.length}
                 </span>
               </button>
@@ -1139,7 +1147,7 @@ export default function AttendanceView({ currentUser, onRefresh }: AttendanceVie
                 onClick={() => setHolidayTab("add")}
                 className={`pb-2.5 px-1 border-b-2 transition flex items-center space-x-1 cursor-pointer ${
                   holidayTab === "add"
-                    ? "border-purple-600 text-purple-700"
+                    ? "border-blue-600 text-blue-600"
                     : "border-transparent text-slate-500 hover:text-slate-800"
                 }`}
               >
@@ -1150,7 +1158,7 @@ export default function AttendanceView({ currentUser, onRefresh }: AttendanceVie
                 onClick={() => setHolidayTab("import")}
                 className={`pb-2.5 px-1 border-b-2 transition flex items-center space-x-1 cursor-pointer ${
                   holidayTab === "import"
-                    ? "border-purple-600 text-purple-700"
+                    ? "border-blue-600 text-blue-600"
                     : "border-transparent text-slate-500 hover:text-slate-800"
                 }`}
               >
@@ -1181,7 +1189,7 @@ export default function AttendanceView({ currentUser, onRefresh }: AttendanceVie
                       <div className="flex items-center justify-center space-x-3">
                         <button
                           onClick={() => setHolidayTab("add")}
-                          className="px-3.5 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-xs font-bold transition shadow-xs cursor-pointer"
+                          className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold transition shadow-xs cursor-pointer"
                         >
                           + Add Holiday
                         </button>
@@ -1205,8 +1213,8 @@ export default function AttendanceView({ currentUser, onRefresh }: AttendanceVie
                       </thead>
                       <tbody className="divide-y divide-slate-100">
                         {holidaysList.map((h) => (
-                          <tr key={h.id} className="hover:bg-purple-50/40 transition">
-                            <td className="py-2.5 px-3 font-mono font-semibold text-purple-900 whitespace-nowrap">
+                          <tr key={h.id} className="hover:bg-blue-50/40 transition">
+                            <td className="py-2.5 px-3 font-mono font-semibold text-blue-900 whitespace-nowrap">
                               {h.date}
                             </td>
                             <td className="py-2.5 px-3 font-bold text-slate-800">
@@ -1243,7 +1251,7 @@ export default function AttendanceView({ currentUser, onRefresh }: AttendanceVie
                       required
                       value={newHolidayDate}
                       onChange={(e) => setNewHolidayDate(e.target.value)}
-                      className="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs bg-slate-50 focus:bg-white outline-none focus:ring-2 focus:ring-purple-500 font-medium"
+                      className="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs bg-slate-50 focus:bg-white outline-none focus:ring-2 focus:ring-blue-500 font-medium"
                     />
                   </div>
 
@@ -1257,7 +1265,7 @@ export default function AttendanceView({ currentUser, onRefresh }: AttendanceVie
                       placeholder="e.g. Republic Day, Independence Day, Diwali"
                       value={newHolidayName}
                       onChange={(e) => setNewHolidayName(e.target.value)}
-                      className="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs bg-slate-50 focus:bg-white outline-none focus:ring-2 focus:ring-purple-500 font-medium"
+                      className="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs bg-slate-50 focus:bg-white outline-none focus:ring-2 focus:ring-blue-500 font-medium"
                     />
                   </div>
 
@@ -1270,7 +1278,7 @@ export default function AttendanceView({ currentUser, onRefresh }: AttendanceVie
                       placeholder="e.g. National Gazetted Holiday"
                       value={newHolidayDesc}
                       onChange={(e) => setNewHolidayDesc(e.target.value)}
-                      className="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs bg-slate-50 focus:bg-white outline-none focus:ring-2 focus:ring-purple-500 font-medium"
+                      className="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs bg-slate-50 focus:bg-white outline-none focus:ring-2 focus:ring-blue-500 font-medium"
                     />
                   </div>
 
@@ -1285,7 +1293,7 @@ export default function AttendanceView({ currentUser, onRefresh }: AttendanceVie
                     <button
                       type="submit"
                       disabled={holidaySaving}
-                      className="px-5 py-2 text-xs font-bold text-white bg-purple-600 hover:bg-purple-700 disabled:opacity-50 rounded-xl transition shadow-md shadow-purple-500/20 flex items-center space-x-1.5 cursor-pointer"
+                      className="px-5 py-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 rounded-xl transition shadow-md shadow-blue-500/20 flex items-center space-x-1.5 cursor-pointer"
                     >
                       <Save className="w-3.5 h-3.5" />
                       <span>{holidaySaving ? "Saving..." : "Save Holiday"}</span>
@@ -1296,10 +1304,10 @@ export default function AttendanceView({ currentUser, onRefresh }: AttendanceVie
 
               {holidayTab === "import" && (
                 <div className="space-y-4">
-                  <div className="p-3 bg-purple-50 border border-purple-200 rounded-xl text-xs text-purple-900 flex items-start justify-between gap-3">
+                  <div className="p-3 bg-blue-50 border border-blue-200 rounded-xl text-xs text-blue-900 flex items-start justify-between gap-3">
                     <div className="space-y-1">
                       <p className="font-bold">Excel / CSV Batch Calendar Import</p>
-                      <p className="text-purple-700 text-[11px]">
+                      <p className="text-blue-700 text-[11px]">
                         Upload your holiday schedule file or copy-paste directly from Excel / Google Sheets.
                         Columns expected: <strong>Date (YYYY-MM-DD), Holiday Name, Notes (optional)</strong>.
                       </p>
@@ -1307,7 +1315,7 @@ export default function AttendanceView({ currentUser, onRefresh }: AttendanceVie
                     <button
                       type="button"
                       onClick={handleDownloadSampleHolidays}
-                      className="shrink-0 flex items-center space-x-1 px-2.5 py-1.5 bg-white border border-purple-300 hover:bg-purple-100 text-purple-800 rounded-lg text-xs font-bold shadow-2xs transition cursor-pointer"
+                      className="shrink-0 flex items-center space-x-1 px-2.5 py-1.5 bg-white border border-blue-300 hover:bg-blue-100 text-blue-800 rounded-lg text-xs font-bold shadow-2xs transition cursor-pointer"
                       title="Download sample Excel template"
                     >
                       <Download className="w-3.5 h-3.5" />
@@ -1334,7 +1342,7 @@ export default function AttendanceView({ currentUser, onRefresh }: AttendanceVie
                           reader.readAsText(file);
                         }
                       }}
-                      className="block w-full text-xs text-slate-500 file:mr-3 file:py-2 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-purple-50 file:text-purple-700 hover:file:bg-purple-100 cursor-pointer border border-slate-300 rounded-xl p-1 bg-slate-50"
+                      className="block w-full text-xs text-slate-500 file:mr-3 file:py-2 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer border border-slate-300 rounded-xl p-1 bg-slate-50"
                     />
                   </div>
 
@@ -1348,7 +1356,7 @@ export default function AttendanceView({ currentUser, onRefresh }: AttendanceVie
                       value={importText}
                       onChange={(e) => parseHolidayCsvText(e.target.value)}
                       placeholder={`2026-01-26, Republic Day, National Holiday\n2026-08-15, Independence Day\n2026-10-02, Gandhi Jayanti\n2026-11-08, Diwali, Festival`}
-                      className="w-full font-mono text-xs px-3 py-2 border border-slate-300 rounded-xl bg-slate-50 focus:bg-white outline-none focus:ring-2 focus:ring-purple-500"
+                      className="w-full font-mono text-xs px-3 py-2 border border-slate-300 rounded-xl bg-slate-50 focus:bg-white outline-none focus:ring-2 focus:ring-blue-500"
                     />
                   </div>
 
@@ -1394,7 +1402,7 @@ export default function AttendanceView({ currentUser, onRefresh }: AttendanceVie
                           type="button"
                           disabled={holidaySaving}
                           onClick={handleBulkImportHolidays}
-                          className="px-5 py-2 text-xs font-bold text-white bg-purple-600 hover:bg-purple-700 disabled:opacity-50 rounded-xl transition shadow-md shadow-purple-500/20 flex items-center space-x-1.5 cursor-pointer"
+                          className="px-5 py-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 rounded-xl transition shadow-md shadow-blue-500/20 flex items-center space-x-1.5 cursor-pointer"
                         >
                           <Upload className="w-3.5 h-3.5" />
                           <span>{holidaySaving ? "Importing..." : `Import ${parsedImportRows.length} Holidays`}</span>

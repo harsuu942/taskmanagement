@@ -438,18 +438,18 @@ export default function EmployeeManagement({
         <div className="flex items-center gap-2.5 flex-wrap sm:flex-nowrap">
           <button
             onClick={openSalaryComponentsModal}
-            className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-4 py-2.5 rounded-lg text-xs transition shadow-sm flex items-center space-x-1.5 flex-shrink-0 cursor-pointer"
+            className="bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 font-bold px-4 py-2.5 rounded-xl text-xs transition shadow-xs flex items-center space-x-1.5 flex-shrink-0 cursor-pointer"
             title="Configure standard earning and deduction component proportions"
           >
-            <Coins className="w-4 h-4" />
-            <span>💰 Set Earning &amp; Deduction Components</span>
+            <Coins className="w-4 h-4 text-slate-500" />
+            <span>Salary Components</span>
           </button>
 
           <button
             onClick={() => setShowAddModal(true)}
-            className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-4 py-2.5 rounded-lg text-xs transition shadow-sm flex items-center space-x-1.5 flex-shrink-0 cursor-pointer"
+            className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-4 py-2.5 rounded-xl text-xs transition shadow-xs flex items-center space-x-1.5 flex-shrink-0 cursor-pointer"
           >
-            <UserPlus className="w-4 h-4" />
+            <UserPlus className="w-4 h-4 text-blue-200" />
             <span>+ Add Employee Profile</span>
           </button>
         </div>
@@ -1218,14 +1218,16 @@ export default function EmployeeManagement({
             onClick={(e) => e.stopPropagation()}
           >
             {/* Modal Header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-gradient-to-r from-emerald-800 to-teal-800 text-white shrink-0">
-              <div className="flex items-center space-x-2.5">
-                <Coins className="w-5 h-5 text-emerald-300" />
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-slate-50 text-slate-900 shrink-0">
+              <div className="flex items-center space-x-3">
+                <div className="p-2 bg-blue-50 text-blue-600 rounded-lg border border-blue-100">
+                  <Coins className="w-5 h-5" />
+                </div>
                 <div>
-                  <h3 className="text-sm font-bold tracking-wide">
+                  <h3 className="text-sm font-bold text-slate-900">
                     Set Earning &amp; Deduction Components
                   </h3>
-                  <p className="text-[11px] text-emerald-200">
+                  <p className="text-[11px] text-slate-500">
                     Rename components, customize percentages, or add new earnings &amp; deductions for employee payslips
                   </p>
                 </div>
@@ -1233,7 +1235,7 @@ export default function EmployeeManagement({
               <button
                 type="button"
                 onClick={() => setShowSalaryComponentsModal(false)}
-                className="text-white/70 hover:text-white p-1 rounded-lg hover:bg-white/10 transition cursor-pointer"
+                className="text-slate-400 hover:text-slate-700 p-1 rounded-lg hover:bg-slate-100 transition cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>

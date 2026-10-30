@@ -763,17 +763,17 @@ export default function LeavesView({
   return (
     <div className="space-y-6 w-full">
       {/* Top Banner with Stats */}
-      <div className="bg-gradient-to-r from-rose-700 via-pink-700 to-amber-700 rounded-2xl p-6 text-white shadow-md flex flex-col md:flex-row items-center justify-between gap-6">
+      <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-xs flex flex-col md:flex-row items-center justify-between gap-6">
         <div>
           <div className="flex items-center space-x-3">
-            <div className="p-2.5 bg-white/20 rounded-xl backdrop-blur-xs">
-              <CalendarDays className="w-6 h-6 text-rose-100" />
+            <div className="p-2.5 bg-blue-50 text-blue-600 rounded-xl border border-blue-100">
+              <CalendarDays className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="text-xl font-extrabold tracking-tight">
+              <h2 className="text-base font-bold text-slate-900">
                 {isAdmin ? "Leave Management & Staff Roster" : "My Leave Portal & Applications"}
               </h2>
-              <p className="text-xs text-rose-100 mt-0.5">
+              <p className="text-xs text-slate-500 mt-0.5">
                 {isAdmin
                   ? "Approve employee leave applications, view leave reports, and track staff availability"
                   : "Apply for leave, track approval statuses, and review leave records"}
@@ -787,11 +787,11 @@ export default function LeavesView({
           {isAdmin && (
             <button
               onClick={openLeaveSettings}
-              className="bg-blue-600 hover:bg-blue-500 text-white border border-blue-400/50 px-3.5 py-2.5 rounded-xl text-xs font-bold transition flex items-center space-x-1.5 shadow-md cursor-pointer"
+              className="bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 px-3.5 py-2.5 rounded-xl text-xs font-bold transition flex items-center space-x-1.5 shadow-xs cursor-pointer"
               title="Configure Leave Types & Annual Quotas for employees"
             >
-              <Settings className="w-4 h-4 text-blue-200" />
-              <span>⚙️ Leave Settings (Types &amp; Quotas)</span>
+              <Settings className="w-4 h-4 text-slate-500" />
+              <span>Leave Settings</span>
             </button>
           )}
 
@@ -803,12 +803,12 @@ export default function LeavesView({
                 setHolidayTab("list");
                 setIsHolidayModalOpen(true);
               }}
-              className="bg-purple-600 hover:bg-purple-500 text-white border border-purple-400/50 px-3.5 py-2.5 rounded-xl text-xs font-bold transition flex items-center space-x-1.5 shadow-md cursor-pointer"
+              className="bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 px-3.5 py-2.5 rounded-xl text-xs font-bold transition flex items-center space-x-1.5 shadow-xs cursor-pointer"
               title="Official Public Holiday Calendar (View, Add, Excel/PDF import)"
             >
-              <Calendar className="w-4 h-4 text-purple-200" />
-              <span>🎉 Public Holiday Calendar</span>
-              <span className="bg-white/25 text-white px-1.5 py-0.2 rounded-full text-[10px] font-extrabold">
+              <Calendar className="w-4 h-4 text-slate-500" />
+              <span>Holiday Calendar</span>
+              <span className="bg-blue-100 text-blue-800 px-1.5 py-0.2 rounded-full text-[10px] font-bold">
                 {holidaysList.length}
               </span>
             </button>
@@ -822,10 +822,10 @@ export default function LeavesView({
                 setImportSuccess(null);
                 setShowImportModal(true);
               }}
-              className="bg-white/20 hover:bg-white/30 text-white border border-white/30 px-3.5 py-2.5 rounded-xl text-xs font-bold transition flex items-center space-x-1.5 cursor-pointer"
+              className="bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 px-3.5 py-2.5 rounded-xl text-xs font-bold transition flex items-center space-x-1.5 shadow-xs cursor-pointer"
               title="Bulk import leave records from Excel, CSV, or PDF text"
             >
-              <Upload className="w-4 h-4" />
+              <Upload className="w-4 h-4 text-slate-500" />
               <span>Import Leaves</span>
             </button>
           )}
@@ -842,10 +842,10 @@ export default function LeavesView({
               setApplyError(null);
               setIsApplyModalOpen(true);
             }}
-            className="bg-white hover:bg-rose-50 text-rose-900 px-4 py-2.5 rounded-xl text-xs font-extrabold shadow-md transition flex items-center space-x-1.5 cursor-pointer"
+            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-xl text-xs font-bold shadow-xs transition flex items-center space-x-1.5 cursor-pointer"
           >
-            <Plus className="w-4 h-4 text-rose-600" />
-            <span>{isAdmin ? "Apply Leave (Staff / Self)" : "Apply for Leave"}</span>
+            <Plus className="w-4 h-4 text-blue-200" />
+            <span>{isAdmin ? "Apply Leave" : "Apply for Leave"}</span>
           </button>
         </div>
       </div>
@@ -856,13 +856,13 @@ export default function LeavesView({
           onClick={() => setActiveMainTab("leaves")}
           className={`flex-1 py-2.5 px-3 rounded-lg transition flex items-center justify-center space-x-2 cursor-pointer ${
             activeMainTab === "leaves"
-              ? "bg-rose-50 text-rose-900 border border-rose-200 shadow-2xs"
+              ? "bg-blue-600 text-white shadow-xs font-bold"
               : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
           }`}
         >
-          <CalendarDays className="w-4 h-4 text-rose-600" />
+          <CalendarDays className="w-4 h-4" />
           <span>Leave Applications</span>
-          <span className="bg-rose-100 text-rose-800 text-[10px] px-2 py-0.2 rounded-full">
+          <span className={`text-[10px] px-2 py-0.2 rounded-full ${activeMainTab === "leaves" ? "bg-white/20 text-white" : "bg-slate-100 text-slate-700"}`}>
             {leaves.length}
           </span>
         </button>
@@ -871,13 +871,13 @@ export default function LeavesView({
           onClick={() => setActiveMainTab("holidays")}
           className={`flex-1 py-2.5 px-3 rounded-lg transition flex items-center justify-center space-x-2 cursor-pointer ${
             activeMainTab === "holidays"
-              ? "bg-purple-50 text-purple-900 border border-purple-200 shadow-2xs"
+              ? "bg-blue-600 text-white shadow-xs font-bold"
               : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
           }`}
         >
-          <Calendar className="w-4 h-4 text-purple-600" />
-          <span>🎉 Official Public Holiday Calendar</span>
-          <span className="bg-purple-100 text-purple-800 text-[10px] px-2 py-0.2 rounded-full font-extrabold">
+          <Calendar className="w-4 h-4" />
+          <span>Official Public Holiday Calendar</span>
+          <span className={`text-[10px] px-2 py-0.2 rounded-full font-bold ${activeMainTab === "holidays" ? "bg-white/20 text-white" : "bg-slate-100 text-slate-700"}`}>
             {holidaysList.length} Holidays
           </span>
         </button>
@@ -888,12 +888,12 @@ export default function LeavesView({
         <div className="bg-white rounded-2xl shadow-xs border border-slate-200 overflow-hidden space-y-4 p-6">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-slate-200 gap-4">
             <div className="flex items-center space-x-3">
-              <div className="p-2.5 bg-purple-100 text-purple-700 rounded-xl">
-                <Calendar className="w-6 h-6" />
+              <div className="p-2.5 bg-blue-50 text-blue-600 rounded-xl border border-blue-100">
+                <Calendar className="w-5 h-5" />
               </div>
               <div>
-                <h3 className="text-base font-extrabold text-slate-900">
-                  🎉 Official Public Holidays Calendar ({holidaysList.length})
+                <h3 className="text-base font-bold text-slate-900">
+                  Official Public Holidays Calendar ({holidaysList.length})
                 </h3>
                 <p className="text-xs text-slate-500">
                   Recognized national &amp; festive holidays. Attendance marks employees as &ldquo;Public Holiday&rdquo; (paid non-working day), and employee leave cannot conflict with these dates.
@@ -910,7 +910,7 @@ export default function LeavesView({
                     setHolidayTab("add");
                     setIsHolidayModalOpen(true);
                   }}
-                  className="bg-purple-600 hover:bg-purple-700 text-white px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center space-x-1.5 shadow-xs cursor-pointer"
+                  className="bg-blue-600 hover:bg-blue-700 text-white px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center space-x-1.5 shadow-xs cursor-pointer"
                 >
                   <Plus className="w-3.5 h-3.5" />
                   <span>Add Public Holiday</span>
@@ -922,9 +922,9 @@ export default function LeavesView({
                     setHolidayTab("import");
                     setIsHolidayModalOpen(true);
                   }}
-                  className="bg-white hover:bg-purple-50 text-purple-800 border border-purple-300 px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center space-x-1.5 shadow-2xs cursor-pointer"
+                  className="bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center space-x-1.5 shadow-2xs cursor-pointer"
                 >
-                  <FileSpreadsheet className="w-3.5 h-3.5 text-purple-600" />
+                  <FileSpreadsheet className="w-3.5 h-3.5 text-blue-600" />
                   <span>Import Excel / PDF</span>
                 </button>
               </div>
@@ -934,7 +934,7 @@ export default function LeavesView({
           {/* Holidays List */}
           {holidaysList.length === 0 ? (
             <div className="p-12 text-center text-slate-500 space-y-3">
-              <div className="w-12 h-12 bg-purple-100 text-purple-600 rounded-2xl flex items-center justify-center mx-auto">
+              <div className="w-12 h-12 bg-blue-50 text-blue-600 border border-blue-100 rounded-2xl flex items-center justify-center mx-auto">
                 <Calendar className="w-6 h-6" />
               </div>
               <h4 className="font-bold text-slate-800 text-sm">No Public Holidays added yet</h4>
@@ -947,7 +947,7 @@ export default function LeavesView({
                     setHolidayTab("add");
                     setIsHolidayModalOpen(true);
                   }}
-                  className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg text-xs font-bold cursor-pointer"
+                  className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-xs font-bold cursor-pointer shadow-xs"
                 >
                   Add First Public Holiday
                 </button>
@@ -973,7 +973,7 @@ export default function LeavesView({
                       <tr key={h.id} className="hover:bg-slate-50/80 transition">
                         <td className="py-3 px-4 font-mono font-bold text-slate-900 whitespace-nowrap">
                           <div>{h.date}</div>
-                          <div className="text-[10px] text-purple-700 font-sans font-semibold">{dayName}</div>
+                          <div className="text-[10px] text-blue-700 font-sans font-semibold">{dayName}</div>
                         </td>
                         <td className="py-3 px-4 font-bold text-slate-800">
                           {h.name}
@@ -982,8 +982,8 @@ export default function LeavesView({
                           {h.description || "Official recognized public holiday"}
                         </td>
                         <td className="py-3 px-4 text-center">
-                          <span className="bg-purple-100 text-purple-800 text-[10px] font-bold px-2.5 py-0.5 rounded-full border border-purple-200">
-                            🌴 Official Paid Holiday
+                          <span className="bg-blue-50 text-blue-700 text-[10px] font-bold px-2.5 py-0.5 rounded-full border border-blue-200">
+                            Official Paid Holiday
                           </span>
                         </td>
                         {isAdmin && (
@@ -1108,7 +1108,8 @@ export default function LeavesView({
                 className="text-blue-600 hover:text-blue-800 font-bold underline cursor-pointer text-[11px] ml-1 flex items-center space-x-1"
                 title="Configure leave types and quota days"
               >
-                <span>⚙️ Configure Quotas</span>
+                <Settings className="w-3.5 h-3.5 text-blue-600 inline" />
+                <span>Configure Quotas</span>
               </button>
             )}
           </div>
@@ -1226,8 +1227,11 @@ export default function LeavesView({
                     </div>
 
                     <div className="text-[11px] text-slate-600 bg-slate-50 p-2 rounded-lg border border-slate-100">
-                      <div className="font-semibold text-slate-800">
-                        📅 {pl.startDate} {pl.startDate !== pl.endDate ? `➔ ${pl.endDate}` : ""}
+                      <div className="font-semibold text-slate-800 flex items-center">
+                        <Calendar className="w-3.5 h-3.5 text-slate-400 mr-1" />
+                        <span>
+                          {pl.startDate} {pl.startDate !== pl.endDate ? `➔ ${pl.endDate}` : ""}
+                        </span>
                         <span className="ml-1 text-slate-500 font-normal">
                           ({pl.leaveType === "HALF_DAY" ? "0.5 Day" : `${pl.daysCount} Day(s)`})
                         </span>
@@ -1916,8 +1920,9 @@ export default function LeavesView({
                 <div className="font-bold text-slate-900 text-xs">
                   {reviewModalLeave.user?.name}
                 </div>
-                <div className="text-[11px] text-slate-600">
-                  📅 {reviewModalLeave.startDate} ➔ {reviewModalLeave.endDate} ({reviewModalLeave.daysCount} day(s))
+                <div className="text-[11px] text-slate-600 flex items-center">
+                  <Calendar className="w-3.5 h-3.5 text-slate-400 mr-1" />
+                  <span>{reviewModalLeave.startDate} ➔ {reviewModalLeave.endDate} ({reviewModalLeave.daysCount} day(s))</span>
                 </div>
                 <div className="text-[11px] text-slate-500 italic mt-1">
                   "{reviewModalLeave.reason}"
@@ -2155,19 +2160,21 @@ export default function LeavesView({
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4 overflow-y-auto">
           <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full border border-slate-200 overflow-hidden my-8 animate-in fade-in zoom-in-95 duration-200">
             {/* Header */}
-            <div className="bg-gradient-to-r from-purple-700 to-indigo-800 text-white p-5 flex items-center justify-between">
-              <div className="flex items-center space-x-2.5">
-                <Calendar className="w-5 h-5 text-purple-200" />
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-slate-50 shrink-0">
+              <div className="flex items-center space-x-3">
+                <div className="p-2 bg-blue-50 text-blue-600 rounded-lg border border-blue-100">
+                  <Calendar className="w-5 h-5" />
+                </div>
                 <div>
-                  <h3 className="font-extrabold text-base">🎉 Official Public Holiday Calendar</h3>
-                  <p className="text-xs text-purple-100">
+                  <h3 className="font-bold text-base text-slate-900">Official Public Holiday Calendar</h3>
+                  <p className="text-xs text-slate-500">
                     Recognized holidays show as &ldquo;Public Holiday&rdquo; (paid non-working day) and restrict leave requests.
                   </p>
                 </div>
               </div>
               <button
                 onClick={() => setIsHolidayModalOpen(false)}
-                className="text-white/80 hover:text-white p-1 rounded-lg hover:bg-white/10 transition cursor-pointer"
+                className="text-slate-400 hover:text-slate-700 p-1 rounded-lg hover:bg-slate-100 transition cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -2183,12 +2190,12 @@ export default function LeavesView({
                 }}
                 className={`pb-2.5 px-1 border-b-2 transition flex items-center space-x-1.5 cursor-pointer ${
                   holidayTab === "list"
-                    ? "border-purple-600 text-purple-700"
+                    ? "border-blue-600 text-blue-600"
                     : "border-transparent text-slate-500 hover:text-slate-800"
                 }`}
               >
                 <span>Holidays List</span>
-                <span className="bg-purple-100 text-purple-800 px-1.5 py-0.2 rounded-full text-[10px]">
+                <span className="bg-blue-100 text-blue-800 px-1.5 py-0.2 rounded-full text-[10px]">
                   {holidaysList.length}
                 </span>
               </button>
@@ -2200,7 +2207,7 @@ export default function LeavesView({
                 }}
                 className={`pb-2.5 px-1 border-b-2 transition flex items-center space-x-1 cursor-pointer ${
                   holidayTab === "add"
-                    ? "border-purple-600 text-purple-700"
+                    ? "border-blue-600 text-blue-600"
                     : "border-transparent text-slate-500 hover:text-slate-800"
                 }`}
               >
@@ -2215,7 +2222,7 @@ export default function LeavesView({
                 }}
                 className={`pb-2.5 px-1 border-b-2 transition flex items-center space-x-1 cursor-pointer ${
                   holidayTab === "import"
-                    ? "border-purple-600 text-purple-700"
+                    ? "border-blue-600 text-blue-600"
                     : "border-transparent text-slate-500 hover:text-slate-800"
                 }`}
               >
@@ -2246,7 +2253,7 @@ export default function LeavesView({
                     <span>Configured Official Holidays ({holidaysList.length})</span>
                     <button
                       onClick={() => setHolidayTab("add")}
-                      className="text-purple-600 font-bold hover:underline cursor-pointer"
+                      className="text-blue-600 font-bold hover:underline cursor-pointer"
                     >
                       + Add New
                     </button>
@@ -2268,7 +2275,7 @@ export default function LeavesView({
                             className="p-3 flex items-center justify-between hover:bg-slate-50 transition"
                           >
                             <div className="flex items-center space-x-3">
-                              <div className="bg-purple-100 text-purple-800 px-2.5 py-1 rounded-lg font-mono font-bold text-xs">
+                              <div className="bg-blue-50 text-blue-800 border border-blue-200 px-2.5 py-1 rounded-lg font-mono font-bold text-xs">
                                 {h.date}
                               </div>
                               <div>
@@ -2304,7 +2311,7 @@ export default function LeavesView({
                       required
                       value={holidayDate}
                       onChange={(e) => setHolidayDate(e.target.value)}
-                      className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs font-medium text-slate-800 outline-none focus:ring-2 focus:ring-purple-500"
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs font-medium text-slate-800 outline-none focus:ring-2 focus:ring-blue-500"
                     />
                   </div>
 
@@ -2318,7 +2325,7 @@ export default function LeavesView({
                       placeholder="e.g. Republic Day, Independence Day, Diwali, Eid..."
                       value={holidayName}
                       onChange={(e) => setHolidayName(e.target.value)}
-                      className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs font-medium text-slate-800 outline-none focus:ring-2 focus:ring-purple-500"
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs font-medium text-slate-800 outline-none focus:ring-2 focus:ring-blue-500"
                     />
                   </div>
 
@@ -2331,7 +2338,7 @@ export default function LeavesView({
                       placeholder="e.g. National Gazetted Holiday across all branches"
                       value={holidayDesc}
                       onChange={(e) => setHolidayDesc(e.target.value)}
-                      className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs font-medium text-slate-800 outline-none focus:ring-2 focus:ring-purple-500"
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs font-medium text-slate-800 outline-none focus:ring-2 focus:ring-blue-500"
                     />
                   </div>
 
@@ -2346,7 +2353,7 @@ export default function LeavesView({
                     <button
                       type="submit"
                       disabled={holidaySubmitting}
-                      className="px-5 py-2 font-bold bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition shadow-xs disabled:opacity-50 flex items-center space-x-1.5 cursor-pointer"
+                      className="px-5 py-2 font-bold bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition shadow-xs disabled:opacity-50 flex items-center space-x-1.5 cursor-pointer"
                     >
                       <Plus className="w-3.5 h-3.5" />
                       <span>{holidaySubmitting ? "Adding..." : "Add to Calendar"}</span>
@@ -2357,8 +2364,8 @@ export default function LeavesView({
 
               {holidayTab === "import" && (
                 <form onSubmit={handleBulkImportHolidays} className="space-y-4 text-xs">
-                  <div className="bg-purple-50/60 border border-purple-200 p-3.5 rounded-xl space-y-2">
-                    <div className="font-bold text-purple-900 flex items-center justify-between">
+                  <div className="bg-blue-50/60 border border-blue-200 p-3.5 rounded-xl space-y-2">
+                    <div className="font-bold text-blue-900 flex items-center justify-between">
                       <span>Import Format (YYYY-MM-DD | Holiday Name | Description):</span>
                       <button
                         type="button"
@@ -2366,12 +2373,12 @@ export default function LeavesView({
                           const sample = `2026-01-26 | Republic Day | National Gazetted Holiday\n2026-03-25 | Holi | Festival of Colors\n2026-08-15 | Independence Day | National Holiday\n2026-10-02 | Mahatma Gandhi Jayanti | Gazetted Holiday\n2026-10-20 | Dussehra (Vijayadashami) | Festival Holiday\n2026-11-08 | Diwali (Deepavali) | Festival of Lights\n2026-12-25 | Christmas Day | Gazetted Holiday`;
                           setHolidayImportText(sample);
                         }}
-                        className="text-purple-700 hover:underline text-[11px] font-semibold cursor-pointer"
+                        className="text-blue-700 hover:underline text-[11px] font-semibold cursor-pointer"
                       >
                         Paste Sample Holidays
                       </button>
                     </div>
-                    <div className="font-mono text-[11px] text-slate-600 bg-white p-2 rounded border border-purple-200">
+                    <div className="font-mono text-[11px] text-slate-600 bg-white p-2 rounded border border-blue-200">
                       2026-01-26 | Republic Day | National Holiday
                     </div>
                     <p className="text-[11px] text-slate-500">
@@ -2381,7 +2388,7 @@ export default function LeavesView({
 
                   <div>
                     <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
-                      Paste Holiday Calendar Rows <span className="text-purple-600">*</span>
+                      Paste Holiday Calendar Rows <span className="text-blue-600">*</span>
                     </label>
                     <textarea
                       rows={6}
@@ -2389,7 +2396,7 @@ export default function LeavesView({
                       placeholder="Paste date and holiday name rows here..."
                       value={holidayImportText}
                       onChange={(e) => setHolidayImportText(e.target.value)}
-                      className="w-full px-3 py-2 font-mono text-xs border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-purple-500"
+                      className="w-full px-3 py-2 font-mono text-xs border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500"
                     />
                   </div>
 
@@ -2404,7 +2411,7 @@ export default function LeavesView({
                     <button
                       type="submit"
                       disabled={holidayImportSubmitting || !holidayImportText.trim()}
-                      className="px-5 py-2 font-bold bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition shadow-xs disabled:opacity-50 flex items-center space-x-1.5 cursor-pointer"
+                      className="px-5 py-2 font-bold bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition shadow-xs disabled:opacity-50 flex items-center space-x-1.5 cursor-pointer"
                     >
                       <Upload className="w-3.5 h-3.5" />
                       <span>{holidayImportSubmitting ? "Importing Holidays..." : "Import Holidays to Calendar"}</span>
@@ -2428,14 +2435,16 @@ export default function LeavesView({
             onClick={(e) => e.stopPropagation()}
           >
             {/* Modal Header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-gradient-to-r from-blue-900 to-indigo-900 text-white shrink-0">
-              <div className="flex items-center space-x-2.5">
-                <Settings className="w-5 h-5 text-blue-300" />
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-slate-50 text-slate-900 shrink-0">
+              <div className="flex items-center space-x-3">
+                <div className="p-2 bg-blue-50 text-blue-600 rounded-lg border border-blue-100">
+                  <Settings className="w-5 h-5" />
+                </div>
                 <div>
-                  <h3 className="text-sm font-bold tracking-wide">
+                  <h3 className="text-sm font-bold text-slate-900">
                     Leave Types &amp; Annual Quota Settings
                   </h3>
-                  <p className="text-[11px] text-blue-200">
+                  <p className="text-[11px] text-slate-500">
                     Rename leave types, configure annual quotas, or create new custom leave types. Types with 0 days are excluded from cards.
                   </p>
                 </div>
@@ -2443,7 +2452,7 @@ export default function LeavesView({
               <button
                 type="button"
                 onClick={() => setIsLeaveSettingsModalOpen(false)}
-                className="text-white/70 hover:text-white p-1 rounded-lg hover:bg-white/10 transition cursor-pointer"
+                className="text-slate-400 hover:text-slate-700 p-1 rounded-lg hover:bg-slate-100 transition cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>

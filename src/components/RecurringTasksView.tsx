@@ -13,6 +13,7 @@ import {
   RefreshCw,
   Sparkles,
   Trash2,
+  Building2,
 } from "lucide-react";
 
 interface RecurringTasksViewProps {
@@ -178,17 +179,17 @@ export default function RecurringTasksView({
   return (
     <div className="space-y-6">
       {/* Top Banner */}
-      <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 rounded-2xl p-6 text-white shadow-xl flex flex-col md:flex-row items-center justify-between gap-6">
+      <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-xs flex flex-col md:flex-row items-center justify-between gap-6">
         <div>
-          <div className="flex items-center space-x-2.5">
-            <div className="p-2 bg-indigo-500/20 border border-indigo-400/30 rounded-xl">
-              <RotateCw className="w-5 h-5 text-indigo-400" />
+          <div className="flex items-center space-x-3">
+            <div className="p-2.5 bg-blue-50 text-blue-600 rounded-xl border border-blue-100">
+              <RotateCw className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="text-base font-extrabold text-white">
+              <h3 className="text-base font-bold text-slate-900">
                 {isAdmin ? "Recurring Task Schedule Engine" : "My Recurring Tasks & Automations"}
               </h3>
-              <p className="text-xs text-indigo-200 mt-0.5">
+              <p className="text-xs text-slate-500 mt-0.5">
                 {isAdmin
                   ? "Automated morning dispatch at 7:00 AM, day-specific monthly schedules, and compliance cycles"
                   : "Your personal recurring tasks automatically spawned into your task list every morning at 7:00 AM"}
@@ -201,16 +202,16 @@ export default function RecurringTasksView({
           <button
             disabled={runningScheduler}
             onClick={triggerSchedulerCycle}
-            className="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-bold px-4 py-2.5 rounded-xl text-xs transition shadow-md flex items-center space-x-1.5 cursor-pointer"
+            className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-bold px-4 py-2.5 rounded-xl text-xs transition shadow-xs flex items-center space-x-1.5 cursor-pointer"
             title="Spawns all pending recurring tasks for today into your task list immediately"
           >
-            <Sparkles className="w-4 h-4 text-amber-300" />
-            <span>{runningScheduler ? "Generating..." : "⚡ Generate Today's Tasks Now"}</span>
+            <Sparkles className="w-4 h-4 text-blue-200" />
+            <span>{runningScheduler ? "Generating..." : "Generate Today's Tasks Now"}</span>
           </button>
 
           <button
             onClick={onOpenCreateModal}
-            className="bg-white hover:bg-slate-100 text-slate-900 font-extrabold px-4 py-2.5 rounded-xl text-xs transition shadow-md flex items-center space-x-1.5 cursor-pointer"
+            className="bg-white hover:bg-slate-50 text-slate-700 font-bold px-4 py-2.5 rounded-xl text-xs border border-slate-300 transition shadow-xs flex items-center space-x-1.5 cursor-pointer"
           >
             <Plus className="w-4 h-4 text-blue-600" />
             <span>Add Task</span>
@@ -304,7 +305,7 @@ export default function RecurringTasksView({
                 placeholder="Search templates by title, employee, client..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full px-3 py-1.5 text-xs bg-white border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 font-medium"
+                className="w-full px-3 py-1.5 text-xs bg-white border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 font-medium"
               />
             </div>
 
@@ -362,7 +363,7 @@ export default function RecurringTasksView({
                     type="checkbox"
                     checked={filteredTemplates.length > 0 && selectedIds.size === filteredTemplates.length}
                     onChange={toggleSelectAll}
-                    className="rounded border-slate-300 text-purple-600 focus:ring-purple-500 cursor-pointer"
+                    className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
                     title="Select / deselect all templates"
                   />
                 </th>
@@ -386,21 +387,22 @@ export default function RecurringTasksView({
                 </tr>
               ) : (
                 filteredTemplates.map((tpl) => (
-                  <tr key={tpl.id} className={`hover:bg-slate-50 transition ${selectedIds.has(tpl.id) ? "bg-purple-50/50" : ""}`}>
+                  <tr key={tpl.id} className={`hover:bg-slate-50 transition ${selectedIds.has(tpl.id) ? "bg-blue-50/50" : ""}`}>
                     <td className="py-3.5 px-3 text-center">
                       <input
                         type="checkbox"
                         checked={selectedIds.has(tpl.id)}
                         onChange={() => toggleSelect(tpl.id)}
-                        className="rounded border-slate-300 text-purple-600 focus:ring-purple-500 cursor-pointer"
+                        className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
                       />
                     </td>
                     <td className="py-3.5 px-4 font-semibold text-slate-800">
                       <div className="font-extrabold text-slate-900 text-xs">{tpl.title}</div>
                       <div className="flex items-center space-x-2 mt-0.5">
                         {tpl.client && (
-                          <span className="text-[10px] font-bold text-cyan-700 bg-cyan-50 px-1.5 py-0.5 rounded border border-cyan-200">
-                            🏢 {tpl.client.company || tpl.client.name}
+                          <span className="text-[10px] font-bold text-cyan-700 bg-cyan-50 px-1.5 py-0.5 rounded border border-cyan-200 flex items-center space-x-1">
+                            <Building2 className="w-3 h-3 text-cyan-600" />
+                            <span>{tpl.client.company || tpl.client.name}</span>
                           </span>
                         )}
                         {tpl.description && (

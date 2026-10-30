@@ -107,15 +107,15 @@ export default function CompletedTasksView({
   return (
     <div className="space-y-6 w-full">
       {/* Top Banner with Stats */}
-      <div className="bg-gradient-to-r from-emerald-700 via-teal-700 to-emerald-600 rounded-2xl p-6 text-white shadow-md flex flex-col md:flex-row items-center justify-between gap-6">
+      <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-xs flex flex-col md:flex-row items-center justify-between gap-6">
         <div>
-          <div className="flex items-center space-x-2.5">
-            <div className="p-2 bg-white/20 rounded-xl backdrop-blur-xs">
-              <CheckCircle2 className="w-6 h-6 text-emerald-200" />
+          <div className="flex items-center space-x-3">
+            <div className="p-2.5 bg-blue-50 text-blue-600 rounded-xl border border-blue-100">
+              <CheckCircle2 className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="text-xl font-extrabold tracking-tight">Completed &amp; Approved Tasks</h2>
-              <p className="text-xs text-emerald-100 mt-0.5">
+              <h2 className="text-base font-bold text-slate-900">Completed &amp; Approved Tasks</h2>
+              <p className="text-xs text-slate-500 mt-0.5">
                 {isAdmin
                   ? "Archived deliverables approved and finalized by Admin"
                   : `Your finalized and approved deliverables (${currentUser?.name})`}
@@ -126,16 +126,16 @@ export default function CompletedTasksView({
 
         {/* Quick KPI Cards */}
         <div className="flex items-center gap-3">
-          <div className="bg-white/15 backdrop-blur-xs px-4 py-2.5 rounded-xl border border-white/20 text-center">
-            <div className="text-[10px] uppercase font-bold text-emerald-200 tracking-wider">
+          <div className="bg-slate-50 px-4 py-2 rounded-xl border border-slate-200 text-center shadow-2xs">
+            <div className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">
               {isAdmin ? "Total Finalized" : "Your Completed"}
             </div>
-            <div className="text-xl font-extrabold text-white mt-0.5">{completedTasks.length} tasks</div>
+            <div className="text-base font-bold text-slate-900 mt-0.5">{completedTasks.length} tasks</div>
           </div>
 
-          <div className="bg-white/15 backdrop-blur-xs px-4 py-2.5 rounded-xl border border-white/20 text-center">
-            <div className="text-[10px] uppercase font-bold text-emerald-200 tracking-wider">Total Time Logged</div>
-            <div className="text-xl font-extrabold font-mono text-white mt-0.5">{formatDuration(totalTimeSeconds)}</div>
+          <div className="bg-slate-50 px-4 py-2 rounded-xl border border-slate-200 text-center shadow-2xs">
+            <div className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Total Time Logged</div>
+            <div className="text-base font-bold font-mono text-slate-900 mt-0.5">{formatDuration(totalTimeSeconds)}</div>
           </div>
         </div>
       </div>

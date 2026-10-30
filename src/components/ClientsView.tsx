@@ -138,15 +138,15 @@ export default function ClientsView({
   return (
     <div className="space-y-6 w-full">
       {/* Top Banner with Stats */}
-      <div className="bg-gradient-to-r from-cyan-700 via-blue-700 to-indigo-700 rounded-2xl p-6 text-white shadow-md flex flex-col md:flex-row items-center justify-between gap-6">
+      <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-xs flex flex-col md:flex-row items-center justify-between gap-6">
         <div>
           <div className="flex items-center space-x-3">
-            <div className="p-2.5 bg-white/20 rounded-xl backdrop-blur-xs">
-              <Building2 className="w-6 h-6 text-cyan-200" />
+            <div className="p-2.5 bg-blue-50 text-blue-600 rounded-xl border border-blue-100">
+              <Building2 className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="text-xl font-extrabold tracking-tight">Client Directory &amp; Accounts</h2>
-              <p className="text-xs text-cyan-100 mt-0.5">
+              <h2 className="text-base font-bold text-slate-900">Client Directory &amp; Accounts</h2>
+              <p className="text-xs text-slate-500 mt-0.5">
                 Manage nacsconsulting enterprise clients, tax portfolios, and audit accounts
               </p>
             </div>
@@ -155,21 +155,21 @@ export default function ClientsView({
 
         {/* Quick KPI Cards & Add Client button */}
         <div className="flex items-center gap-3 flex-wrap sm:flex-nowrap">
-          <div className="bg-white/15 backdrop-blur-xs px-4 py-2.5 rounded-xl border border-white/20 text-center">
-            <div className="text-[10px] uppercase font-bold text-cyan-200 tracking-wider">Total Clients</div>
-            <div className="text-xl font-extrabold text-white mt-0.5">{clients.length}</div>
+          <div className="bg-slate-50 px-4 py-2 rounded-xl border border-slate-200 text-center shadow-2xs">
+            <div className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Total Clients</div>
+            <div className="text-base font-bold text-slate-900 mt-0.5">{clients.length}</div>
           </div>
 
-          <div className="bg-white/15 backdrop-blur-xs px-4 py-2.5 rounded-xl border border-white/20 text-center">
-            <div className="text-[10px] uppercase font-bold text-cyan-200 tracking-wider">Associated Tasks</div>
-            <div className="text-xl font-extrabold text-white mt-0.5">{totalClientTasks}</div>
+          <div className="bg-slate-50 px-4 py-2 rounded-xl border border-slate-200 text-center shadow-2xs">
+            <div className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Associated Tasks</div>
+            <div className="text-base font-bold text-slate-900 mt-0.5">{totalClientTasks}</div>
           </div>
 
           <button
             onClick={handleOpenAddModal}
-            className="bg-white hover:bg-cyan-50 text-cyan-900 px-4 py-2.5 rounded-xl text-xs font-extrabold shadow-md transition flex items-center space-x-1.5"
+            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl text-xs font-bold shadow-xs transition flex items-center space-x-1.5 cursor-pointer"
           >
-            <Plus className="w-4 h-4 text-cyan-700" />
+            <Plus className="w-4 h-4" />
             <span>Add Client</span>
           </button>
         </div>
@@ -313,9 +313,9 @@ export default function ClientsView({
                         {onOpenCreateTaskForClient && (
                           <button
                             onClick={() => onOpenCreateTaskForClient(client.id)}
-                            className="inline-flex items-center space-x-1 px-2.5 py-1.5 text-xs font-bold text-cyan-700 bg-cyan-50 hover:bg-cyan-100 rounded-lg border border-cyan-200 transition"
+                            className="inline-flex items-center space-x-1 px-2.5 py-1.5 text-xs font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-lg border border-blue-200 transition"
                           >
-                            <Plus className="w-3.5 h-3.5 text-cyan-600" />
+                            <Plus className="w-3.5 h-3.5 text-blue-600" />
                             <span>Add Task</span>
                           </button>
                         )}
@@ -335,7 +335,7 @@ export default function ClientsView({
           <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-lg w-full overflow-hidden animate-in fade-in zoom-in-95 duration-200">
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-slate-50">
               <div className="flex items-center space-x-2">
-                <Building2 className="w-5 h-5 text-cyan-600" />
+                <Building2 className="w-5 h-5 text-blue-600" />
                 <h3 className="text-sm font-bold text-slate-900">
                   {editingClient ? `Edit Client: ${editingClient.name}` : "Add New Client Account"}
                 </h3>

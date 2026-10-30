@@ -605,7 +605,7 @@ export default function SettingsModal({
                 }`}
               >
                 <Palmtree className="w-3.5 h-3.5 text-blue-600" />
-                <span>🌴 Leave Types &amp; Quotas</span>
+                <span>Leave Types &amp; Quotas</span>
               </button>
 
               <button
@@ -617,8 +617,8 @@ export default function SettingsModal({
                     : "text-slate-600 hover:text-slate-900"
                 }`}
               >
-                <Coins className="w-3.5 h-3.5 text-emerald-600" />
-                <span>💰 Salary Components</span>
+                <Coins className="w-3.5 h-3.5 text-blue-600" />
+                <span>Salary Components</span>
               </button>
 
               <button

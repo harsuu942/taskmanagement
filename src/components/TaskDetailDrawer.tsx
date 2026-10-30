@@ -919,14 +919,25 @@ export default function TaskDetailDrawer({
                   </div>
                 ) : (
                   <div className="mt-2">
-                    <div className="text-xs font-semibold text-slate-700 py-1 px-2.5 rounded bg-slate-50 border border-slate-200">
-                      {task.adminStatus === "FINAL_COMPLETED"
-                        ? "🎉 Final Approved by Admin"
-                        : task.adminStatus === "PENDING_REVIEW"
-                        ? "⏳ Awaiting Admin Sign-off"
-                        : task.adminStatus === "REVISION_REQUESTED"
-                        ? "⚠️ Revision Requested by Admin"
-                        : "Not yet submitted to Admin"}
+                    <div className="text-xs font-semibold text-slate-700 py-1.5 px-3 rounded-lg bg-slate-50 border border-slate-200 flex items-center space-x-1.5">
+                      {task.adminStatus === "FINAL_COMPLETED" ? (
+                        <>
+                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                          <span>Final Approved by Admin</span>
+                        </>
+                      ) : task.adminStatus === "PENDING_REVIEW" ? (
+                        <>
+                          <Clock className="w-3.5 h-3.5 text-amber-600" />
+                          <span>Awaiting Admin Sign-off</span>
+                        </>
+                      ) : task.adminStatus === "REVISION_REQUESTED" ? (
+                        <>
+                          <AlertTriangle className="w-3.5 h-3.5 text-rose-600" />
+                          <span>Revision Requested by Admin</span>
+                        </>
+                      ) : (
+                        <span>Not yet submitted to Admin</span>
+                      )}
                     </div>
                     <p className="text-[10px] text-slate-500 mt-1.5 italic">
                       * Only Admin has permission to mark a task as Final Completed.
