@@ -90,6 +90,10 @@ export default function TaskListView({
     .filter(isTaskVisibleForUser);
 
   const overdueTasksCount = visibleBaseTasks.filter(isTaskOverdue).length;
+  const todoCount = visibleBaseTasks.filter((t) => t.employeeStatus === "TODO").length;
+  const inProgressCount = visibleBaseTasks.filter((t) => t.employeeStatus === "IN_PROGRESS").length;
+  const onHoldCount = visibleBaseTasks.filter((t) => t.employeeStatus === "ON_HOLD").length;
+  const reviewCount = visibleBaseTasks.filter((t) => t.adminStatus === "PENDING_REVIEW").length;
 
   // Check if any filter is active
   const isFiltered =
@@ -294,7 +298,7 @@ export default function TaskListView({
           <select
             value={filterClient}
             onChange={(e) => setFilterClient(e.target.value)}
-            className="text-xs bg-white border border-cyan-300 rounded-lg px-3 py-2 text-cyan-950 focus:outline-none focus:ring-1 focus:ring-cyan-500 font-semibold shadow-2xs"
+            className="text-xs bg-white border border-slate-200 rounded-xl px-3 py-2 text-slate-700 hover:border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 font-medium shadow-2xs transition cursor-pointer"
           >
             <option value="ALL">All Clients</option>
             {clients.map((c) => (
@@ -309,7 +313,7 @@ export default function TaskListView({
             <select
               value={filterAssignee}
               onChange={(e) => setFilterAssignee(e.target.value)}
-              className="text-xs bg-white border border-slate-300 rounded-lg px-3 py-2 text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-500 font-medium shadow-2xs"
+              className="text-xs bg-white border border-slate-200 rounded-xl px-3 py-2 text-slate-700 hover:border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 font-medium shadow-2xs transition cursor-pointer"
             >
               <option value="ALL">All Assignees</option>
               {allUsers.map((u) => (
@@ -319,8 +323,8 @@ export default function TaskListView({
               ))}
             </select>
           ) : (
-            <div className="text-xs bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 text-blue-800 font-bold flex items-center gap-1">
-              <Lock className="w-3 h-3 text-blue-600" />
+            <div className="text-xs bg-blue-50 border border-blue-200 rounded-xl px-3 py-2 text-blue-800 font-bold flex items-center gap-1.5 shadow-2xs">
+              <Lock className="w-3.5 h-3.5 text-blue-600" />
               <span>Your Tasks Only</span>
             </div>
           )}
@@ -329,9 +333,9 @@ export default function TaskListView({
           <select
             value={filterRecurrence}
             onChange={(e) => setFilterRecurrence(e.target.value)}
-            className="text-xs bg-white border border-slate-300 rounded-lg px-3 py-2 text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-500 font-medium shadow-2xs"
+            className="text-xs bg-white border border-slate-200 rounded-xl px-3 py-2 text-slate-700 hover:border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 font-medium shadow-2xs transition cursor-pointer"
           >
-            <option value="ALL">All Recurrence</option>
+            <option value="ALL">All Frequencies</option>
             <option value="ONE_TIME">One-time</option>
             <option value="DAILY">Daily (7:00 AM)</option>
             <option value="WEEKLY">Weekly</option>
@@ -345,7 +349,7 @@ export default function TaskListView({
           <select
             value={filterPriority}
             onChange={(e) => setFilterPriority(e.target.value)}
-            className="text-xs bg-white border border-slate-300 rounded-lg px-3 py-2 text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-500 font-medium shadow-2xs"
+            className="text-xs bg-white border border-slate-200 rounded-xl px-3 py-2 text-slate-700 hover:border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 font-medium shadow-2xs transition cursor-pointer"
           >
             <option value="ALL">All Priorities</option>
             <option value="URGENT">Urgent</option>
@@ -354,42 +358,12 @@ export default function TaskListView({
             <option value="LOW">Low</option>
           </select>
 
-          {/* Status Filter (Overdue option available on both sides) */}
-          <select
-            value={filterStatus}
-            onChange={(e) => setFilterStatus(e.target.value)}
-            className="text-xs bg-white border border-slate-300 rounded-lg px-3 py-2 text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-500 font-medium shadow-2xs"
-          >
-            <option value="ALL">All Statuses</option>
-            <option value="OVERDUE">⚠️ Overdue Tasks ({overdueTasksCount})</option>
-            <option value="TODO">To Do</option>
-            <option value="IN_PROGRESS">In Progress</option>
-            <option value="ON_HOLD">On Hold</option>
-            <option value="PENDING_REVIEW">Awaiting Admin Review</option>
-          </select>
-
-          {/* Quick Overdue Filter Button on Both Sides */}
-          {overdueTasksCount > 0 && (
-            <button
-              onClick={() => setFilterStatus(filterStatus === "OVERDUE" ? "ALL" : "OVERDUE")}
-              className={`px-3 py-2 rounded-lg text-xs font-bold transition-all flex items-center space-x-1.5 shadow-2xs ${
-                filterStatus === "OVERDUE"
-                  ? "bg-rose-600 text-white border border-rose-700 shadow-rose-500/20"
-                  : "bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100"
-              }`}
-              title="Filter by Overdue tasks"
-            >
-              <AlertTriangle className="w-3.5 h-3.5" />
-              <span>Overdue ({overdueTasksCount})</span>
-            </button>
-          )}
-
           {/* Prominent Clear Filters Button */}
           <button
             onClick={handleClearFilters}
-            className={`px-3 py-2 rounded-lg text-xs font-bold transition-all flex items-center space-x-1.5 shadow-2xs ${
+            className={`px-3 py-2 rounded-xl text-xs font-bold transition flex items-center space-x-1.5 shadow-2xs cursor-pointer ${
               isFiltered
-                ? "bg-rose-100 text-rose-800 border border-rose-300 hover:bg-rose-200"
+                ? "bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100"
                 : "bg-slate-100 text-slate-500 border border-slate-200 hover:bg-slate-200"
             }`}
             title="Reset all filters and search keyword"
@@ -397,7 +371,7 @@ export default function TaskListView({
             <RotateCcw className="w-3.5 h-3.5" />
             <span>Clear Filters</span>
             {isFiltered && (
-              <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping ml-1" />
+              <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping ml-0.5" />
             )}
           </button>
 
@@ -405,7 +379,7 @@ export default function TaskListView({
           {onAddNewTask && (
             <button
               onClick={onAddNewTask}
-              className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-3.5 py-2 rounded-lg text-xs transition shadow-sm flex items-center gap-1.5 whitespace-nowrap cursor-pointer"
+              className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-4 py-2 rounded-xl text-xs transition shadow-xs flex items-center gap-1.5 whitespace-nowrap cursor-pointer active:scale-95"
             >
               <Plus className="w-3.5 h-3.5" />
               <span>Add Task</span>
@@ -414,26 +388,101 @@ export default function TaskListView({
         </div>
       </div>
 
-      {/* Row Color Status Legend */}
-      <div className="px-4 py-2 bg-slate-100/60 border-b border-slate-200 text-[11px] text-slate-600 flex items-center gap-4 flex-wrap">
-        <span className="font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1">
-          <Tag className="w-3 h-3" /> Status Row Color Code:
+      {/* Interactive Quick Status Navigation Filter Strip */}
+      <div className="px-4 py-2.5 bg-slate-50/70 border-b border-slate-200 text-xs flex items-center gap-2 flex-wrap overflow-x-auto">
+        <span className="font-bold uppercase tracking-wider text-[10px] text-slate-400 mr-1 flex items-center gap-1">
+          <Filter className="w-3 h-3" /> Quick Filter:
         </span>
-        <span className="flex items-center gap-1 font-semibold text-slate-700">
-          <span className="w-3 h-3 rounded-sm bg-white border-2 border-slate-300 inline-block"></span> To Do (White/Gray)
-        </span>
-        <span className="flex items-center gap-1 font-semibold text-blue-700">
-          <span className="w-3 h-3 rounded-sm bg-blue-100 border-2 border-blue-500 inline-block"></span> In Progress (Blue)
-        </span>
-        <span className="flex items-center gap-1 font-semibold text-amber-700">
-          <span className="w-3 h-3 rounded-sm bg-amber-100 border-2 border-amber-500 inline-block"></span> On Hold (Amber)
-        </span>
-        <span className="flex items-center gap-1 font-semibold text-purple-700">
-          <span className="w-3 h-3 rounded-sm bg-purple-100 border-2 border-purple-500 inline-block"></span> Completed / Review (Purple)
-        </span>
-        <span className="flex items-center gap-1 font-semibold text-emerald-700">
-          <span className="w-3 h-3 rounded-sm bg-emerald-100 border-2 border-emerald-500 inline-block"></span> Final Approved (Green)
-        </span>
+        <button
+          onClick={() => setFilterStatus("ALL")}
+          className={`px-3 py-1 rounded-lg text-xs font-bold transition flex items-center space-x-1.5 cursor-pointer ${
+            filterStatus === "ALL"
+              ? "bg-blue-600 text-white shadow-xs"
+              : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"
+          }`}
+        >
+          <span>All Active</span>
+          <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${filterStatus === "ALL" ? "bg-white/20 text-white" : "bg-slate-100 text-slate-700"}`}>
+            {visibleBaseTasks.length}
+          </span>
+        </button>
+
+        <button
+          onClick={() => setFilterStatus(filterStatus === "TODO" ? "ALL" : "TODO")}
+          className={`px-3 py-1 rounded-lg text-xs font-bold transition flex items-center space-x-1.5 cursor-pointer ${
+            filterStatus === "TODO"
+              ? "bg-slate-800 text-white shadow-xs"
+              : "bg-white text-slate-700 hover:bg-slate-100 border border-slate-200"
+          }`}
+        >
+          <span className="w-2 h-2 rounded-full bg-slate-400" />
+          <span>To Do</span>
+          <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${filterStatus === "TODO" ? "bg-white/20 text-white" : "bg-slate-100 text-slate-700"}`}>
+            {todoCount}
+          </span>
+        </button>
+
+        <button
+          onClick={() => setFilterStatus(filterStatus === "IN_PROGRESS" ? "ALL" : "IN_PROGRESS")}
+          className={`px-3 py-1 rounded-lg text-xs font-bold transition flex items-center space-x-1.5 cursor-pointer ${
+            filterStatus === "IN_PROGRESS"
+              ? "bg-blue-600 text-white shadow-xs"
+              : "bg-white text-blue-700 hover:bg-blue-50 border border-blue-200"
+          }`}
+        >
+          <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
+          <span>In Progress</span>
+          <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${filterStatus === "IN_PROGRESS" ? "bg-white/20 text-white" : "bg-blue-50 text-blue-700"}`}>
+            {inProgressCount}
+          </span>
+        </button>
+
+        <button
+          onClick={() => setFilterStatus(filterStatus === "ON_HOLD" ? "ALL" : "ON_HOLD")}
+          className={`px-3 py-1 rounded-lg text-xs font-bold transition flex items-center space-x-1.5 cursor-pointer ${
+            filterStatus === "ON_HOLD"
+              ? "bg-amber-600 text-white shadow-xs"
+              : "bg-white text-amber-700 hover:bg-amber-50 border border-amber-200"
+          }`}
+        >
+          <span className="w-2 h-2 rounded-full bg-amber-500" />
+          <span>On Hold</span>
+          <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${filterStatus === "ON_HOLD" ? "bg-white/20 text-white" : "bg-amber-50 text-amber-700"}`}>
+            {onHoldCount}
+          </span>
+        </button>
+
+        <button
+          onClick={() => setFilterStatus(filterStatus === "PENDING_REVIEW" ? "ALL" : "PENDING_REVIEW")}
+          className={`px-3 py-1 rounded-lg text-xs font-bold transition flex items-center space-x-1.5 cursor-pointer ${
+            filterStatus === "PENDING_REVIEW"
+              ? "bg-purple-600 text-white shadow-xs"
+              : "bg-white text-purple-700 hover:bg-purple-50 border border-purple-200"
+          }`}
+        >
+          <span className="w-2 h-2 rounded-full bg-purple-500" />
+          <span>Awaiting Review</span>
+          <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${filterStatus === "PENDING_REVIEW" ? "bg-white/20 text-white" : "bg-purple-50 text-purple-700"}`}>
+            {reviewCount}
+          </span>
+        </button>
+
+        {overdueTasksCount > 0 && (
+          <button
+            onClick={() => setFilterStatus(filterStatus === "OVERDUE" ? "ALL" : "OVERDUE")}
+            className={`px-3 py-1 rounded-lg text-xs font-bold transition flex items-center space-x-1.5 cursor-pointer ${
+              filterStatus === "OVERDUE"
+                ? "bg-rose-600 text-white shadow-xs"
+                : "bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200"
+            }`}
+          >
+            <AlertTriangle className="w-3 h-3 text-rose-500" />
+            <span>Overdue</span>
+            <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${filterStatus === "OVERDUE" ? "bg-white/20 text-white" : "bg-rose-100 text-rose-800"}`}>
+              {overdueTasksCount}
+            </span>
+          </button>
+        )}
       </div>
 
       {/* Sticky Bulk Actions Bar */}
@@ -683,8 +732,9 @@ export default function TaskListView({
                           </span>
                         </div>
                         {isTaskOverdue(task) && (
-                          <span className="inline-flex items-center gap-0.5 text-[9px] font-extrabold px-1.5 py-0.2 rounded bg-rose-100 text-rose-800 border border-rose-300 w-max animate-pulse">
-                            ⚠️ OVERDUE
+                          <span className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200 w-max shadow-2xs">
+                            <AlertTriangle className="w-2.5 h-2.5 text-rose-600" />
+                            Overdue
                           </span>
                         )}
                       </div>

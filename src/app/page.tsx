@@ -15,6 +15,7 @@ import TaskModal from "@/components/TaskModal";
 import TaskDetailDrawer from "@/components/TaskDetailDrawer";
 import SettingsModal from "@/components/SettingsModal";
 import LoginView from "@/components/LoginView";
+import { Building2, ShieldCheck, Users, Lock, LogOut } from "lucide-react";
 
 export default function Home() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -376,37 +377,54 @@ export default function Home() {
         completedTasksCount={completedTasksCount}
       />
 
-      {/* Role Context & Breadcrumb Bar */}
-      <div className="bg-white border-b border-slate-200 px-4 sm:px-6 lg:px-8 py-2.5 w-full">
+      {/* Workspace Context & Breadcrumb Sub-Header */}
+      <div className="bg-white/80 backdrop-blur-md border-b border-slate-200/80 px-4 sm:px-6 lg:px-8 py-2 w-full">
         <div className="w-full flex items-center justify-between flex-wrap gap-2 text-xs">
           <div className="flex items-center space-x-2.5">
-            <span className="font-bold text-slate-500">Active Workspace:</span>
+            <div className="flex items-center space-x-1.5 text-slate-500 font-medium">
+              <Building2 className="w-3.5 h-3.5 text-slate-400" />
+              <span>Workspace</span>
+              <span className="text-slate-300">/</span>
+            </div>
             <span
-              className={`px-3 py-1 rounded-full font-bold uppercase tracking-wider text-[11px] ${
+              className={`px-2.5 py-0.5 rounded-full font-bold text-[11px] flex items-center space-x-1.5 ${
                 currentUser?.role === "ADMIN"
-                  ? "bg-purple-100 text-purple-800 border border-purple-300"
-                  : "bg-blue-100 text-blue-800 border border-blue-300"
+                  ? "bg-blue-50 text-blue-700 border border-blue-200"
+                  : "bg-emerald-50 text-emerald-700 border border-emerald-200"
               }`}
             >
-              {currentUser?.role === "ADMIN" ? "👑 Admin Portal" : "💼 Employee Portal"}
+              {currentUser?.role === "ADMIN" ? (
+                <>
+                  <ShieldCheck className="w-3.5 h-3.5 text-blue-600" />
+                  <span>Admin Portal</span>
+                </>
+              ) : (
+                <>
+                  <Users className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>Employee Portal</span>
+                </>
+              )}
             </span>
             <span className="text-slate-300 hidden sm:inline">&bull;</span>
-            <span className="text-slate-600 hidden sm:inline font-medium">
-              Signed in as <strong className="text-slate-900">{currentUser?.name}</strong> ({currentUser?.email})
+            <span className="text-slate-600 hidden sm:inline text-xs">
+              Signed in as <strong className="text-slate-900 font-semibold">{currentUser?.name}</strong>
+              <span className="text-slate-400 ml-1">({currentUser?.email})</span>
             </span>
             {currentUser?.role === "EMPLOYEE" && (
-              <span className="text-blue-700 bg-blue-50 px-2 py-0.5 rounded text-[10px] font-semibold border border-blue-200">
-                🔒 Personal Task Isolation Active
+              <span className="hidden md:inline-flex items-center space-x-1 text-slate-600 bg-slate-100 px-2 py-0.5 rounded text-[10px] font-medium border border-slate-200">
+                <Lock className="w-3 h-3 text-slate-400" />
+                <span>Personal Task Isolation</span>
               </span>
             )}
           </div>
 
-          <div className="flex items-center space-x-3 text-slate-500 text-[11px]">
+          <div className="flex items-center space-x-3 text-slate-500 text-xs">
             <button
               onClick={handleLogout}
-              className="text-rose-600 hover:text-rose-700 font-bold hover:underline"
+              className="text-slate-500 hover:text-rose-600 font-semibold flex items-center space-x-1 transition cursor-pointer"
             >
-              Log Out / Switch Login
+              <LogOut className="w-3.5 h-3.5" />
+              <span>Sign Out</span>
             </button>
           </div>
         </div>
